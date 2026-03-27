@@ -13,6 +13,9 @@ if (window.matchMedia && window.matchMedia('(max-width:768px)').matches) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png" sizes="192x192">
+<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
 <meta name="theme-color" content="#0b1220">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -6859,10 +6862,8 @@ function cGerarStreetView(evt) {
 
 /* ---- CIDADE: filtrar ao digitar ---- */
 function cFiltrarCidade(val) {
-  var el = document.getElementById('cidadeFilter');
-  if (!el) return;
-  // Disparar o evento 'input' para que o initMap processe a mudança
-  el.dispatchEvent(new Event('input', { bubbles: true }));
+  // O addEventListener('input') do initMap já processa a mudança
+  // Nada a fazer aqui -- evita loop infinito
 }
 
 
