@@ -318,6 +318,7 @@ if (window.matchMedia && window.matchMedia('(max-width:768px)').matches) {
       display:flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: flex-start;
       z-index: 5;
       pointer-events:none;
     }
@@ -331,6 +332,8 @@ if (window.matchMedia && window.matchMedia('(max-width:768px)').matches) {
       font-size: 12px;
       line-height: 1.25;
       min-width: 120px;
+      height: fit-content;
+      align-self: flex-start;
       color:#111827;
     }
     .hudTitle{ font-weight:900; }
@@ -3423,6 +3426,14 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     window._mapAgruparCidades = function() {
       if (typeof agruparEstacoesPorCidade === 'function') agruparEstacoesPorCidade();
     };
+    // Helper: atualiza o mapa sem reload completo
+    // Invalida cache -> reagrupa -> re-renderiza só o necessário
+    window._refreshMapa = function() {
+      if (window._mapInvalidateCache) window._mapInvalidateCache();
+      if (window._mapAgruparCidades)  window._mapAgruparCidades();
+      if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
+      else if (typeof renderDebounced_ === 'function') renderDebounced_(true);
+    };
     window._mapInvalidateGrid = function(cidade) {
       try {
         if (window.perf && window.perf.gridByCity) {
@@ -4890,9 +4901,7 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 
     if (btnRecarregar) btnRecarregar.addEventListener('click', () => {
       hardResetLayers_();
-      _gasRun('excluirEstacaoFromMapa', { codigo: _editEstacao.codigo, email: CS.user && CS.user.email },
-          onData,
-          err => console.error('getEstacoesWebApp erro:', err));
+      loadEstacoes_(onData);
     });
 
     [
@@ -6067,13 +6076,9 @@ async function cSubmit() {
           if (!novaEst.__id) {
             novaEst.__id = novaEst.codigo ? ('COD:' + novaEst.codigo) : ('tmp-' + Date.now());
           }
-          // Adicionar ao índice por cidade
-          if (window._mapAgruparCidades) window._mapAgruparCidades();
-          // Invalidar cache de visíveis + grid para garantir que a nova estação apareça
-          if (window._mapInvalidateCache) window._mapInvalidateCache();
+          // Atualizar mapa imediatamente (sem reload)
           if (window._mapInvalidateGrid && novaEst.cidade) window._mapInvalidateGrid(novaEst.cidade);
-          // Forçar re-render
-          if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
+          if (window._refreshMapa) window._refreshMapa();
         }
       }
     } catch(e) {}
@@ -6322,7 +6327,7 @@ function cSaveEdit() {
 
   function doSave(fotoB64) {
     if (fotoB64) payload.foto = { base64: fotoB64, mime: 'image/jpeg', name: 'foto.jpg' };
-    _gasRun('addEstacaoFromMapa', payloads[idx],
+    _gasRun('editarEstacaoFromMapa', payload,
         function(res) {
         if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
         if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao salvar', 'error'); return; }
@@ -6341,10 +6346,7 @@ function cSaveEdit() {
               break;
             }
           }
-          if (window._mapInvalidateCache) window._mapInvalidateCache();
-          if (window._mapAgruparCidades)  window._mapAgruparCidades();
-          if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
-          else if (typeof renderDebounced_ === 'function') renderDebounced_(true);
+          if (window._refreshMapa) window._refreshMapa();
         }
       },
         function(e) {
@@ -6374,7 +6376,25 @@ function cDeleteEstacao() {
   var btn = document.getElementById('eSaveBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Excluindo...'; }
 
-}  /* excluir já tratado acima */
+  var _delPayload = { codigo: _editEstacao && _editEstacao.codigo, email: CS.user && CS.user.email };
+  _gasRun('excluirEstacaoFromMapa', _delPayload,
+    function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
+      cToast('Estacao excluida!', 'success');
+      cCloseEdit();
+      if (window.estacoes) {
+        var cod = _editEstacao && _editEstacao.codigo;
+        window.estacoes = estacoes.filter(function(e){ return e.codigo !== cod; });
+        if (window._refreshMapa) window._refreshMapa();
+      }
+      _editEstacao = null;
+    },
+    function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
+      cToast('Erro: ' + String(e), 'error');
+    });
+}
 
 /* ---- RESET/CLOSE ---- */
 function dNovoRegistro() { cOpenDrawer(); }
