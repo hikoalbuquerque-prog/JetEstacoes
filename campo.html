@@ -3435,9 +3435,11 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     };
     // Helper: remove estacao do array LOCAL (escopo do initMap) e refresha
     window._removerEstacao = function(codigo) {
+      console.log('[_removerEstacao] codigo:', codigo, '| estacoes.length antes:', estacoes.length);
       var idx = estacoes.findIndex(function(e){ return e.codigo === codigo; });
+      console.log('[_removerEstacao] idx encontrado:', idx);
       if (idx >= 0) estacoes.splice(idx, 1);
-      // Remover do estacoesPorCidade tambem
+      console.log('[_removerEstacao] estacoes.length depois:', estacoes.length);
       Object.keys(estacoesPorCidade).forEach(function(cidade) {
         var arr = estacoesPorCidade[cidade];
         if (!arr) return;
@@ -3445,6 +3447,7 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
         if (i >= 0) arr.splice(i, 1);
       });
       if (window._refreshMapa) window._refreshMapa();
+      console.log('[_removerEstacao] _refreshMapa chamado');
     };
     window._mapInvalidateGrid = function(cidade) {
       try {
@@ -6393,14 +6396,19 @@ function cDeleteEstacao() {
     function(res) {
       if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
       if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
+      var cod = _editEstacao && _editEstacao.codigo;
+      console.log('[excluir] cod:', cod,
+        '| _removerEstacao:', typeof window._removerEstacao,
+        '| estacoes.length:', window._removerEstacao ? '(via closure)' : (window.estacoes ? window.estacoes.length : 'N/A'));
       cToast('Estacao excluida!', 'success');
       cCloseEdit();
-      var cod = _editEstacao && _editEstacao.codigo;
       if (window._removerEstacao) {
         window._removerEstacao(cod);
+        console.log('[excluir] _removerEstacao chamada para:', cod);
       } else if (window.estacoes) {
         window.estacoes = window.estacoes.filter(function(e){ return e.codigo !== cod; });
         if (window._refreshMapa) window._refreshMapa();
+        console.log('[excluir] fallback filter usado');
       }
       _editEstacao = null;
     },
