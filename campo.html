@@ -3427,12 +3427,24 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (typeof agruparEstacoesPorCidade === 'function') agruparEstacoesPorCidade();
     };
     // Helper: atualiza o mapa sem reload completo
-    // Invalida cache -> reagrupa -> re-renderiza só o necessário
     window._refreshMapa = function() {
       if (window._mapInvalidateCache) window._mapInvalidateCache();
       if (window._mapAgruparCidades)  window._mapAgruparCidades();
       if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
       else if (typeof renderDebounced_ === 'function') renderDebounced_(true);
+    };
+    // Helper: remove estacao do array LOCAL (escopo do initMap) e refresha
+    window._removerEstacao = function(codigo) {
+      var idx = estacoes.findIndex(function(e){ return e.codigo === codigo; });
+      if (idx >= 0) estacoes.splice(idx, 1);
+      // Remover do estacoesPorCidade tambem
+      Object.keys(estacoesPorCidade).forEach(function(cidade) {
+        var arr = estacoesPorCidade[cidade];
+        if (!arr) return;
+        var i = arr.findIndex(function(e){ return e.codigo === codigo; });
+        if (i >= 0) arr.splice(i, 1);
+      });
+      if (window._refreshMapa) window._refreshMapa();
     };
     window._mapInvalidateGrid = function(cidade) {
       try {
@@ -6383,9 +6395,11 @@ function cDeleteEstacao() {
       if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
       cToast('Estacao excluida!', 'success');
       cCloseEdit();
-      if (window.estacoes) {
-        var cod = _editEstacao && _editEstacao.codigo;
-        window.estacoes = estacoes.filter(function(e){ return e.codigo !== cod; });
+      var cod = _editEstacao && _editEstacao.codigo;
+      if (window._removerEstacao) {
+        window._removerEstacao(cod);
+      } else if (window.estacoes) {
+        window.estacoes = window.estacoes.filter(function(e){ return e.codigo !== cod; });
         if (window._refreshMapa) window._refreshMapa();
       }
       _editEstacao = null;
