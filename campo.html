@@ -5336,11 +5336,11 @@ var CAMPO = { BACKEND_URL: 'https://script.google.com/macros/s/AKfycbzV1R7PTCpE7
 
 /* ── _gasRun: transporta chamadas GAS tanto dentro do iframe quanto no GitHub Pages ── */
 function _gasRun(fn, payload, onSuccess, onFailure) {
-  // Se google.script.run está disponível, usar direto (dentro do GAS iframe)
+  // Dentro do GAS iframe: usar google.script.run diretamente
   if (window.google && window.google.script && window.google.script.run) {
-    var runner = window._gasRun('geocodeEndereco', q,
-        onSuccess || function(){},
-        onFailure || function(e){ console.error('GAS erro:', fn, e); });
+    var runner = window.google.script.run
+      .withSuccessHandler(onSuccess || function(){})
+      .withFailureHandler(onFailure || function(e){ console.error('GAS erro:', fn, e); });
     if (payload !== undefined) {
       runner[fn](payload);
     } else {
@@ -5348,20 +5348,21 @@ function _gasRun(fn, payload, onSuccess, onFailure) {
     }
     return;
   }
-  // Fora do GAS (GitHub Pages / standalone): usar fetch
+  // GitHub Pages / standalone: fetch GET sem headers customizados
+  // (evita preflight CORS -- GET simples é sempre permitido pelo browser)
   var url = CAMPO.BACKEND_URL
     + '?action=' + encodeURIComponent(fn)
     + '&d='      + encodeURIComponent(JSON.stringify(payload !== undefined ? payload : {}));
-  fetch(url, {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(res) { if (onSuccess) onSuccess(res); })
-  .catch(function(e) {
-    if (onFailure) onFailure(e);
-    else console.error('_gasRun fetch erro:', fn, e);
-  });
+  fetch(url, { method: 'GET', redirect: 'follow' })
+    .then(function(r) {
+      if (!r.ok && r.type !== 'opaqueredirect') throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(res) { if (onSuccess) onSuccess(res); })
+    .catch(function(e) {
+      if (onFailure) onFailure(e);
+      else console.error('_gasRun fetch erro:', fn, e);
+    });
 }
 
 /* Variante para loginCampo (args separados) */
