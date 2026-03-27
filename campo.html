@@ -1592,12 +1592,12 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
   <!-- FILA DE CONTROLES (colapsa para a esquerda do FAB) -->
   <div id="mapaFabControls" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-bottom:8px">
     <!-- Centralizar -->
-    <button onclick="document.getElementById('btnCentralizar').click()" title="Centralizar"
+    <button onclick="if(window._fabCentralizar)window._fabCentralizar()" title="Centralizar"
       class="map-fab-ctrl" id="fabCentralizar">
       <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06z"/></svg>
     </button>
     <!-- Recarregar -->
-    <button onclick="document.getElementById('btnRecarregar').click()" title="Recarregar"
+    <button onclick="if(window._fabRecarregar)window._fabRecarregar()" title="Recarregar"
       class="map-fab-ctrl" id="fabRecarregar">
       <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
     </button>
@@ -1607,17 +1607,17 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       <svg viewBox="0 0 24 24"><path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4C7.4 8.8 7 9.4 7 10c0 .6.2 1.2.6 1.6L10 14v5h2v-6l-2.2-2.5 1-1zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/></svg>
     </button>
     <!-- Polígonos -->
-    <button onclick="document.getElementById('btnPoligonos').click()" title="Polígonos"
+    <button onclick="if(window._fabPoligonos)window._fabPoligonos()" title="Polígonos"
       class="map-fab-ctrl" id="fabPoligonos">
       <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5z"/></svg>
     </button>
     <!-- Cluster -->
-    <button onclick="document.getElementById('btnCluster').click()" title="Cluster"
+    <button onclick="if(window._fabCluster)window._fabCluster()" title="Cluster"
       class="map-fab-ctrl" id="fabCluster">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="6" cy="7" r="2.5"/><circle cx="18" cy="7" r="2.5"/><circle cx="6" cy="17" r="2.5"/><circle cx="18" cy="17" r="2.5"/></svg>
     </button>
     <!-- Raio Estações -->
-    <button onclick="document.getElementById('btnRaioCentro').click()" title="Raio Estações"
+    <button onclick="if(window._fabRaio)window._fabRaio()" title="Raio Estações"
       class="map-fab-ctrl" id="fabRaio">
       <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/></svg>
     </button>
@@ -4946,6 +4946,36 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     if (btnRecarregar) btnRecarregar.addEventListener('click', function() {
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     });
+
+    // Expor ações dos FABs diretamente no window
+    // Elimina dependência de getElementById em FABs cujos botões-alvo não existem no campo.html
+    window._fabCentralizar = function() {
+      if (!map) return;
+      if (elCidade && elCidade.value && estacoesPorCidade[elCidade.value] && estacoesPorCidade[elCidade.value].length) {
+        fitBoundsCidade(estacoesPorCidade[elCidade.value]);
+      } else {
+        map.setCenter({ lat: -14.235, lng: -51.925 });
+        map.setZoom(5);
+      }
+      safeRenderRequest_(true);
+    };
+    window._fabRecarregar = function() {
+      if (window._recarregarEstacoes) window._recarregarEstacoes();
+    };
+    window._fabPoligonos = function() {
+      if (!MAP_STATE) return;
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      dispatch_('TOGGLE_POLYGONS');
+    };
+    window._fabCluster = function() {
+      if (!MAP_STATE) return;
+      dispatch_('TOGGLE_CLUSTER');
+    };
+    window._fabRaio = function() {
+      if (!MAP_STATE) return;
+      if (MAP_STATE.layer !== LAYER.NORMAL) return;
+      dispatch_('TOGGLE_STATION_RADIUS');
+    };
 
     [
       elChkPublica, elChkPrivada, elChkConcorrente,
