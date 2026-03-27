@@ -5325,10 +5325,29 @@ setInterval(() => {
 <script>
 (function(){
   var key='MAPS_KEY_VALUE';
-  if(!key||key==='MAPS_KEY_VALUE')return;
-  var s=document.createElement('script');
-  s.src='https://maps.googleapis.com/maps/api/js?key='+key+'&callback=initMap&libraries=geometry,places';
-  s.async=true;document.head.appendChild(s);
+  function loadMaps(k) {
+    var s=document.createElement('script');
+    s.src='https://maps.googleapis.com/maps/api/js?key='+k+'&callback=initMap&libraries=geometry,places';
+    s.async=true;document.head.appendChild(s);
+  }
+  if(key && key!=='MAPS_KEY_VALUE'){
+    // Chave injetada pelo GAS (modo normal)
+    loadMaps(key);
+  } else {
+    // GitHub Pages: buscar chave do backend via fetch
+    var backendUrl = (window.CAMPO && window.CAMPO.BACKEND_URL) ||
+      'https://script.google.com/macros/s/AKfycbzPM0lN2w5wS4fT9jtUGkWSkfiw5cDSt6x7khxxiHa46ag98rrYxJEGoJ1-iU950Q84/exec';
+    fetch(backendUrl + '?action=getMapsKey', { method:'GET', redirect:'follow' })
+      .then(function(r){ return r.text(); })
+      .then(function(t){
+        try {
+          var res = JSON.parse(t);
+          if(res && res.key) loadMaps(res.key);
+          else console.error('[Maps] key nao retornada:', t.substring(0,100));
+        } catch(e){ console.error('[Maps] parse erro:', e); }
+      })
+      .catch(function(e){ console.error('[Maps] fetch erro:', e); });
+  }
 })();
 </script>
 
