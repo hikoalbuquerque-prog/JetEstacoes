@@ -3427,11 +3427,34 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (typeof agruparEstacoesPorCidade === 'function') agruparEstacoesPorCidade();
     };
     // Helper: atualiza o mapa sem reload completo
+    // Limpa clusterer + cache de markers + forca re-render total
     window._refreshMapa = function() {
+      // 1. Limpar cache de estacoes visiveis
       if (window._mapInvalidateCache) window._mapInvalidateCache();
+      // 2. Reagrupar por cidade
       if (window._mapAgruparCidades)  window._mapAgruparCidades();
-      if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
-      else if (typeof renderDebounced_ === 'function') renderDebounced_(true);
+      // 3. Limpar clusterer (remove markers do clusterer interno)
+      try { if (typeof clearClusters_ === 'function') clearClusters_(); } catch(e) {}
+      // 4. Limpar cache de markers da cidade ativa
+      try {
+        var cidade = window._getCidadeAtiva ? window._getCidadeAtiva() : null;
+        if (typeof hideActiveCity_ === 'function') {
+          hideActiveCity_(cidade);
+          hideActiveCity_(null);
+        }
+      } catch(e) {}
+      // 5. Zerar lastRenderKey_ para garantir que render processa tudo
+      try { lastRenderKey_ = ''; } catch(e) {}
+      // 6. Render direto com force=true
+      if (typeof render === 'function') {
+        render(true);
+      } else if (typeof renderDebounced_ === 'function') {
+        renderDebounced_(true);
+      }
+    };
+    // Expor getCidadeAtiva para o _refreshMapa
+    window._getCidadeAtiva = function() {
+      return (typeof elCidade !== 'undefined' && elCidade) ? (elCidade.value || null) : null;
     };
     // Helper: remove estacao do array LOCAL (escopo do initMap) e refresha
     window._removerEstacao = function(codigo) {
