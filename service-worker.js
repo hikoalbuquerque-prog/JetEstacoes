@@ -8,7 +8,7 @@
  * atualização em todos os clientes.
  */
 
-var SW_VERSION   = 'campo-v1';
+var SW_VERSION   = 'campo-v2';
 var CACHE_STATIC = SW_VERSION + '-static';
 var CACHE_DATA   = SW_VERSION + '-data';
 
