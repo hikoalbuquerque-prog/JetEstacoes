@@ -5472,6 +5472,7 @@ function cInitAuth() {
 
     _gasRun('loginCampo', { email: email, senha: senha },
       function(res) {
+        console.log('[login] res recebido:', JSON.stringify(res));
         btnEl.disabled    = false;
         btnEl.textContent = 'Entrar';
         if (!res || !res.ok) {
