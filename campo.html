@@ -3456,6 +3456,12 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     window._getCidadeAtiva = function() {
       return (typeof elCidade !== 'undefined' && elCidade) ? (elCidade.value || null) : null;
     };
+    // Recarregar estacoes do servidor + resetar mapa (igual ao botao Recarregar)
+    window._recarregarEstacoes = function() {
+      try { hardResetLayers_(); } catch(e) {}
+      _gasRun('getEstacoesWebApp', undefined, onData,
+        function(err) { console.error('[recarregar] erro:', err); });
+    };
     // Helper: remove estacao do array LOCAL (escopo do initMap) e refresha
     window._removerEstacao = function(codigo) {
       console.log('[_removerEstacao] codigo:', codigo, '| estacoes.length antes:', estacoes.length);
@@ -4937,9 +4943,8 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       safeRenderRequest_(true);
     });
 
-    if (btnRecarregar) btnRecarregar.addEventListener('click', () => {
-      hardResetLayers_();
-      loadEstacoes_(onData);
+    if (btnRecarregar) btnRecarregar.addEventListener('click', function() {
+      if (window._recarregarEstacoes) window._recarregarEstacoes();
     });
 
     [
@@ -5538,8 +5543,7 @@ function cInitAuth() {
 
     _gasRun('loginCampo', { email: email, senha: senha },
       function(res) {
-        console.log('[login] res recebido:', JSON.stringify(res));
-        btnEl.disabled    = false;
+          btnEl.disabled    = false;
         btnEl.textContent = 'Entrar';
         if (!res || !res.ok) {
           if (res && res.naoAutorizado) {
@@ -6116,7 +6120,7 @@ async function cSubmit() {
           }
           // Atualizar mapa imediatamente (sem reload)
           if (window._mapInvalidateGrid && novaEst.cidade) window._mapInvalidateGrid(novaEst.cidade);
-          if (window._refreshMapa) window._refreshMapa();
+          if (window._recarregarEstacoes) window._recarregarEstacoes();
         }
       }
     } catch(e) {}
@@ -6384,7 +6388,7 @@ function cSaveEdit() {
               break;
             }
           }
-          if (window._refreshMapa) window._refreshMapa();
+          if (window._recarregarEstacoes) window._recarregarEstacoes();
         }
       },
         function(e) {
@@ -6420,20 +6424,11 @@ function cDeleteEstacao() {
       if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
       if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
       var cod = _editEstacao && _editEstacao.codigo;
-      console.log('[excluir] cod:', cod,
-        '| _removerEstacao:', typeof window._removerEstacao,
-        '| estacoes.length:', window._removerEstacao ? '(via closure)' : (window.estacoes ? window.estacoes.length : 'N/A'));
       cToast('Estacao excluida!', 'success');
       cCloseEdit();
-      if (window._removerEstacao) {
-        window._removerEstacao(cod);
-        console.log('[excluir] _removerEstacao chamada para:', cod);
-      } else if (window.estacoes) {
-        window.estacoes = window.estacoes.filter(function(e){ return e.codigo !== cod; });
-        if (window._refreshMapa) window._refreshMapa();
-        console.log('[excluir] fallback filter usado');
-      }
       _editEstacao = null;
+      // Recarregar do servidor para garantir mapa sincronizado
+      if (window._recarregarEstacoes) window._recarregarEstacoes();
     },
     function(e) {
       if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
