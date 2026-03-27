@@ -5358,10 +5358,27 @@ function _gasRun(fn, payload, onSuccess, onFailure) {
     + '&d='      + encodeURIComponent(JSON.stringify(payload !== undefined ? payload : {}));
   fetch(url, { method: 'GET', redirect: 'follow' })
     .then(function(r) {
-      if (!r.ok && r.type !== 'opaqueredirect') throw new Error('HTTP ' + r.status);
-      return r.json();
+      // Opaque response = redirect cross-origin sem CORS header
+      // Acontece quando o deploy GAS não é "Anyone" ou quando há redirect adicional
+      if (r.type === 'opaque' || r.type === 'opaqueredirect') {
+        console.warn('[_gasRun] Resposta opaca para ' + fn + ' -- verifique deploy GAS (Execute as: Me, Access: Anyone)');
+        if (onFailure) onFailure(new Error('Resposta opaca do servidor. Verifique permissoes do deploy GAS.'));
+        return null;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
     })
-    .then(function(res) { if (onSuccess) onSuccess(res); })
+    .then(function(text) {
+      if (!text) return;
+      var res;
+      try { res = JSON.parse(text); }
+      catch(e) {
+        console.error('[_gasRun] Resposta nao-JSON para ' + fn + ':', text.substring(0,200));
+        if (onFailure) onFailure(new Error('Resposta invalida do servidor'));
+        return;
+      }
+      if (onSuccess) onSuccess(res);
+    })
     .catch(function(e) {
       if (onFailure) onFailure(e);
       else console.error('_gasRun fetch erro:', fn, e);
