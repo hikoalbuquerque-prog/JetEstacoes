@@ -313,7 +313,7 @@ if (window.matchMedia && window.matchMedia('(max-width:768px)').matches) {
     =============================== */
     #mapHud{
       position:absolute;
-      top: 10px;
+      bottom: 56px;
       left: 10px;
       display:flex;
       gap: 8px;
@@ -955,7 +955,7 @@ select.pxNative{
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 body{font-family:'DM Sans',Arial,sans-serif}
 @media(min-width:769px){#mapHud{left:10px;top:8px}}
-    @media(max-width:768px){#mapHud{top:8px;bottom:auto;left:auto;right:8px;flex-direction:column;align-items:flex-end}}
+    @media(max-width:768px){#mapHud{bottom:56px;top:auto;left:8px;right:auto;flex-direction:row;flex-wrap:wrap;align-items:flex-end}}
 
 /* MARCADOR MONITOR: borda âmbar */
 .marker-monitor { outline: 3px solid #f59e0b !important; border-radius: 50%; }
