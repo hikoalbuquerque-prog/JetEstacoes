@@ -2158,6 +2158,9 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 
       case 'TOGGLE_POLYGONS':
         s.polygons = !s.polygons;
+        // Garantir city e zoom atuais antes de calcular canPolygons
+        s.city = (elCidade && elCidade.value) || s.city || '';
+        s.zoom = (map && map.getZoom()) || s.zoom || 0;
         s.forceRender = true;
         break;
 
