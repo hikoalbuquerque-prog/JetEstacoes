@@ -4500,8 +4500,10 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       return;
     }
 
+    console.log('[POLY_LOAD] carregando cidade:', cidade);
     _gasRun('getPoligonosCidade', cidade,
       function(lista) {
+        console.log('[POLY_LOAD] resposta GAS:', Array.isArray(lista) ? lista.length + ' polígonos' : typeof lista, lista && lista[0]);
         var arr = Array.isArray(lista) ? lista : [];
         cache.polygonsMeta = arr.map(function(p) { return normalizePolyMeta_(p, cidade); });
         cache.polygonsLoaded = true;
@@ -4606,7 +4608,15 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     const cidade = elCidade?.value || '';
     const zoomOk = map && (map.getZoom() >= ZOOM_POLY_MIN);
 
+    console.log('[RENDER_POLY] cidade:', cidade, '| zoomOk:', zoomOk,
+      '| polygons:', MAP_STATE && MAP_STATE.polygons,
+      '| canPolygons:', MAP_STATE && MAP_STATE.canPolygons);
     if (!MAP_STATE || !(MAP_STATE.polygons && MAP_STATE.canPolygons) || !cidade || !zoomOk) {
+      console.log('[RENDER_POLY] RETORNO CEDO -- motivo:',
+        !MAP_STATE ? 'sem MAP_STATE' :
+        !MAP_STATE.polygons ? 'polygons=false' :
+        !MAP_STATE.canPolygons ? 'canPolygons=false' :
+        !cidade ? 'cidade vazia' : 'zoom<12');
       if (cidade) hideAllPolygonsCity_(cidade);
       if (polyLazyTimer) { clearTimeout(polyLazyTimer); polyLazyTimer = null; }
       return;
@@ -4987,8 +4997,17 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     };
     window._fabPoligonos = function() {
-      if (!MAP_STATE) return;
-      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      var cidade = elCidade && elCidade.value;
+      var zoom   = map && map.getZoom();
+      console.log('[FAB_POLY] cidade:', cidade, '| zoom:', zoom,
+        '| MAP_STATE.city:', MAP_STATE && MAP_STATE.city,
+        '| canPolygons:', MAP_STATE && MAP_STATE.canPolygons,
+        '| polygons:', MAP_STATE && MAP_STATE.polygons,
+        '| layer:', MAP_STATE && MAP_STATE.layer);
+      if (!MAP_STATE) { console.log('[FAB_POLY] sem MAP_STATE'); return; }
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) {
+        console.log('[FAB_POLY] BLOQUEADO: canPolygons=false polygons=false');
+      }
       dispatch_('TOGGLE_POLYGONS');
     };
     window._fabCluster = function() {
