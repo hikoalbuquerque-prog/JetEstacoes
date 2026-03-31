@@ -1177,6 +1177,15 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
           </button>
         </div>
 
+        <!-- GESTÃO DE POLÍGONOS -->
+        <div class="panelCard">
+          <button onclick="cAbrirPoligonos()" id="btnGestaoPoligonos"
+            style="width:100%;padding:11px;border-radius:10px;background:rgba(124,58,237,.12);border:1px solid rgba(124,58,237,.3);color:#c4b5fd;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#c4b5fd"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+            Gestão de Polígonos
+          </button>
+        </div>
+
         <!-- FILTROS -->
         <div class="panelCard">
           <div class="panelTitle">Filtros</div>
@@ -4928,7 +4937,9 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     }
 
     if (btnPoligonos) btnPoligonos.addEventListener('click', function() {
-      if (typeof cAbrirPoligonos === 'function') cAbrirPoligonos();
+      if (!MAP_STATE) return;
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      dispatch_('TOGGLE_POLYGONS');
     });
 
     if (btnRaio) btnRaio.addEventListener('click', () => {
@@ -4973,9 +4984,9 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     };
     window._fabPoligonos = function() {
-      if (typeof cAbrirPoligonos === 'function') {
-        cAbrirPoligonos();
-      }
+      if (!MAP_STATE) return;
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      dispatch_('TOGGLE_POLYGONS');
     };
     window._fabCluster = function() {
       if (!MAP_STATE) return;
@@ -8177,9 +8188,7 @@ document.querySelectorAll('.flt-toggle').forEach(function(lbl) {
   }
   var fabCtrlMap = {
     'fabCiclovias': null,
-    'fabPoligonos': function() {
-      if (typeof cAbrirPoligonos === 'function') cAbrirPoligonos();
-    },
+    'fabPoligonos': function() { _safeDispatch('TOGGLE_POLYGONS'); },
     'fabCluster':   function() { _safeDispatch('TOGGLE_CLUSTER'); },
     'fabRaio':      function() { _safeDispatch('TOGGLE_STATION_RADIUS'); },
   };
