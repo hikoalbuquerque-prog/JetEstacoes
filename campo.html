@@ -4500,10 +4500,8 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       return;
     }
 
-    console.log('[POLY_LOAD] carregando cidade:', cidade);
     _gasRun('getPoligonosCidade', cidade,
       function(lista) {
-        console.log('[POLY_LOAD] resposta GAS:', Array.isArray(lista) ? lista.length + ' polígonos' : typeof lista, lista && lista[0]);
         var arr = Array.isArray(lista) ? lista : [];
         cache.polygonsMeta = arr.map(function(p) { return normalizePolyMeta_(p, cidade); });
         cache.polygonsLoaded = true;
@@ -4608,15 +4606,7 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     const cidade = elCidade?.value || '';
     const zoomOk = map && (map.getZoom() >= ZOOM_POLY_MIN);
 
-    console.log('[RENDER_POLY] cidade:', cidade, '| zoomOk:', zoomOk,
-      '| polygons:', MAP_STATE && MAP_STATE.polygons,
-      '| canPolygons:', MAP_STATE && MAP_STATE.canPolygons);
     if (!MAP_STATE || !(MAP_STATE.polygons && MAP_STATE.canPolygons) || !cidade || !zoomOk) {
-      console.log('[RENDER_POLY] RETORNO CEDO -- motivo:',
-        !MAP_STATE ? 'sem MAP_STATE' :
-        !MAP_STATE.polygons ? 'polygons=false' :
-        !MAP_STATE.canPolygons ? 'canPolygons=false' :
-        !cidade ? 'cidade vazia' : 'zoom<12');
       if (cidade) hideAllPolygonsCity_(cidade);
       if (polyLazyTimer) { clearTimeout(polyLazyTimer); polyLazyTimer = null; }
       return;
@@ -4997,17 +4987,8 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     };
     window._fabPoligonos = function() {
-      var cidade = elCidade && elCidade.value;
-      var zoom   = map && map.getZoom();
-      console.log('[FAB_POLY] cidade:', cidade, '| zoom:', zoom,
-        '| MAP_STATE.city:', MAP_STATE && MAP_STATE.city,
-        '| canPolygons:', MAP_STATE && MAP_STATE.canPolygons,
-        '| polygons:', MAP_STATE && MAP_STATE.polygons,
-        '| layer:', MAP_STATE && MAP_STATE.layer);
-      if (!MAP_STATE) { console.log('[FAB_POLY] sem MAP_STATE'); return; }
-      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) {
-        console.log('[FAB_POLY] BLOQUEADO: canPolygons=false polygons=false');
-      }
+      if (!MAP_STATE) return;
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
       dispatch_('TOGGLE_POLYGONS');
     };
     window._fabCluster = function() {
@@ -8049,6 +8030,30 @@ function drawSalvarEdit() {
   // Atualizar cor do polígono no mapa
   d.poly.setOptions({ strokeColor: cor, fillColor: cor });
 
+  // Persistir no GAS
+  (function(it) {
+    if (it.rowId) {
+      _gasRun('atualizarPoligono',
+        { rowId: it.rowId, nome: it.nome, cidade: it.cidade, grupo: it.grupo,
+          fase: it.fase, tipo: it.tipo, prioridade: it.prioridade,
+          ativo: it.ativo, cor: it.cor, pipe: it.pipe },
+        function(res) {
+          cToast(res && res.ok ? '"' + it.nome + '" atualizado na planilha!' :
+            'Local OK. GAS: ' + (res && res.error || ''), res && res.ok ? 'success' : 'warn');
+        },
+        function(e) { cToast('Erro GAS: ' + e, 'error'); }
+      );
+    } else {
+      _gasRun('salvarPoligono', it,
+        function(res) {
+          if (res && res.ok && res.rowId) it.rowId = res.rowId;
+          cToast('"' + it.nome + '" salvo na planilha!', 'success');
+        },
+        function(e) { cToast('Erro GAS: ' + e, 'error'); }
+      );
+    }
+  })(item);
+
   drawDesselecionar();
   pAtualizarBadges();
   drawRenderLista();
@@ -8066,6 +8071,19 @@ function drawExcluirSelecionado() {
 
   // Remover do mapa
   d.poly.setMap(null);
+
+  // Persistir exclusão no GAS
+  if (d.itemIdx >= 0 && item && item.rowId) {
+    (function(rowId, cid) {
+      _gasRun('excluirPoligono', { rowId: rowId, cidade: cid },
+        function(res) {
+          cToast(res && res.ok ? '"' + nome + '" excluído da planilha' :
+            'Local OK. GAS: ' + (res && res.error || ''), res && res.ok ? 'success' : 'warn');
+        },
+        function(e) { cToast('Erro GAS excluir: ' + e, 'error'); }
+      );
+    })(item.rowId, item.cidade);
+  }
 
   // Remover de _polyItems
   if (d.itemIdx >= 0) {
