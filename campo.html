@@ -4927,10 +4927,8 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       });
     }
 
-    if (btnPoligonos) btnPoligonos.addEventListener('click', () => {
-      if (!MAP_STATE) return;
-      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
-      dispatch_('TOGGLE_POLYGONS');
+    if (btnPoligonos) btnPoligonos.addEventListener('click', function() {
+      if (typeof cAbrirPoligonos === 'function') cAbrirPoligonos();
     });
 
     if (btnRaio) btnRaio.addEventListener('click', () => {
@@ -4975,9 +4973,9 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     };
     window._fabPoligonos = function() {
-if (!MAP_STATE) return;
-      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
-      dispatch_('TOGGLE_POLYGONS');
+      if (typeof cAbrirPoligonos === 'function') {
+        cAbrirPoligonos();
+      }
     };
     window._fabCluster = function() {
       if (!MAP_STATE) return;
