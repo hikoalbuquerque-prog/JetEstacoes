@@ -3243,10 +3243,9 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
     callAddEstacao_(payload){
       if (window.google?.script?.run && google.script.run.addEstacaoFromMapa){
         return new Promise((resolve) => {
-          _gasRun('getPoligonosCidade', cidade,
+          _gasRun('addEstacaoFromMapa', payload,
               (res) => resolve(res),
-              (e) => resolve({ ok:false, error: String(e?.message || e) }))
-            .addEstacaoFromMapa(payload);
+              (e) => resolve({ ok:false, error: String(e?.message || e) }));
         });
       }
       return Promise.resolve({ ok:false, error:'Backend não publicado com addEstacaoFromMapa().' });
@@ -4468,28 +4467,26 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
   function carregarPoligonosCidade_(cidade, cb) {
     if (!cidade) { cb([]); return; }
 
-    const cache = ensureCityCache_(cidade);
+    var cache = ensureCityCache_(cidade);
     if (cache.polygonsLoaded) {
       cb(cache.polygonsMeta);
       return;
     }
 
-    _gasRun('getEstacoesWebApp', undefined,
-        function(lista) {
-        const arr = Array.isArray(lista) ? lista : [];
-        cache.polygonsMeta = arr.map(p => normalizePolyMeta_(p, cidade));
+    _gasRun('getPoligonosCidade', cidade,
+      function(lista) {
+        var arr = Array.isArray(lista) ? lista : [];
+        cache.polygonsMeta = arr.map(function(p) { return normalizePolyMeta_(p, cidade); });
         cache.polygonsLoaded = true;
-
-        cache.polygonsMeta.forEach(meta => {
-          const poly = ensurePolygonInstance_(cache, meta);
+        cache.polygonsMeta.forEach(function(meta) {
+          var poly = ensurePolygonInstance_(cache, meta);
           poly.__meta = meta;
           applyPolygonStyle_(poly, meta);
         });
-
         atualizarUIGruposPoligonos_(cidade);
         cb(cache.polygonsMeta);
       },
-        function(err) {
+      function(err) {
         console.error('getPoligonosCidade erro:', err);
         cache.polygonsMeta = [];
         cache.polygonsLoaded = true;
