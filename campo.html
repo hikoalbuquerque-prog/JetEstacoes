@@ -7386,7 +7386,8 @@ function pCarregarDaBase() {
           ativo: p.ativo !== false,
           cor: p.cor || '#2563eb',
           cidade: p.cidade || cidade,
-          pipe: pts.map(function(pt) { return pt.lat + ',' + pt.lng; }).join('|')
+          pipe: pts.map(function(pt) { return pt.lat + ',' + pt.lng; }).join('|'),
+          rowId: p.rowId || null
         });
       });
       pAtualizarBadges();
