@@ -4500,7 +4500,7 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       return;
     }
 
-    _gasRun('getPoligonosCidade', cidade,
+    _gasRun('getPoligonosCidade', { cidade: cidade },
       function(lista) {
         var arr = Array.isArray(lista) ? lista : [];
         cache.polygonsMeta = arr.map(function(p) { return normalizePolyMeta_(p, cidade); });
@@ -7380,7 +7380,7 @@ function pCarregarDaBase() {
   var cidade = (document.getElementById('pCidade') || {}).value || '';
   if (!cidade) cidade = (document.getElementById('cidadeFilter') || {}).value || '';
   if (!cidade) return;
-  _gasRun('getPoligonosCidade', cidade,
+  _gasRun('getPoligonosCidade', { cidade: cidade },
     function(lista) {
       if (!Array.isArray(lista) || !lista.length) return;
       lista.forEach(function(p) {
