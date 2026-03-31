@@ -4578,8 +4578,13 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
   function renderPoligonos() {
     const cidade = elCidade?.value || '';
     const zoomOk = map && (map.getZoom() >= ZOOM_POLY_MIN);
+    console.log('[RENDER_POLY] cidade:', cidade, '| zoomOk:', zoomOk,
+      '| polygons:', MAP_STATE && MAP_STATE.polygons,
+      '| canPolygons:', MAP_STATE && MAP_STATE.canPolygons,
+      '| chkPoligonos.checked:', elChkPoligonos && elChkPoligonos.checked);
 
     if (!MAP_STATE || !(MAP_STATE.polygons && MAP_STATE.canPolygons) || !cidade || !zoomOk) {
+      console.log('[RENDER_POLY] RETORNOU cedo -- condicao nao atendida');
       if (cidade) hideAllPolygonsCity_(cidade);
       if (polyLazyTimer) { clearTimeout(polyLazyTimer); polyLazyTimer = null; }
       return;
@@ -4960,9 +4965,22 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
       if (window._recarregarEstacoes) window._recarregarEstacoes();
     };
     window._fabPoligonos = function() {
-      if (!MAP_STATE) return;
-      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      console.log('[FAB_POLY] MAP_STATE:', JSON.stringify({
+        city: MAP_STATE && MAP_STATE.city,
+        zoom: MAP_STATE && MAP_STATE.zoom,
+        canPolygons: MAP_STATE && MAP_STATE.canPolygons,
+        polygons: MAP_STATE && MAP_STATE.polygons,
+        layer: MAP_STATE && MAP_STATE.layer
+      }));
+      console.log('[FAB_POLY] elCidade.value:', typeof elCidade !== 'undefined' ? elCidade && elCidade.value : 'undef');
+      console.log('[FAB_POLY] map.getZoom():', typeof map !== 'undefined' && map ? map.getZoom() : 'undef');
+      if (!MAP_STATE) { console.log('[FAB_POLY] BLOQUEADO: sem MAP_STATE'); return; }
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) {
+        console.log('[FAB_POLY] BLOQUEADO: canPolygons=false e polygons=false');
+        return;
+      }
       dispatch_('TOGGLE_POLYGONS');
+      console.log('[FAB_POLY] dispatch TOGGLE_POLYGONS enviado');
     };
     window._fabCluster = function() {
       if (!MAP_STATE) return;
