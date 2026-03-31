@@ -8201,6 +8201,17 @@ document.querySelectorAll('.flt-toggle').forEach(function(lbl) {
     if (!window.MAP_STATE && window._mapFSMInit) window._mapFSMInit();
     // Feedback quando condicao nao satisfeita
     if (type === 'TOGGLE_POLYGONS') {
+      // Forcar sync de city/zoom antes de verificar canPolygons
+      if (window.MAP_STATE) {
+        var elCid = document.getElementById('cidadeFilter');
+        var gmap  = window._gmap || (window.perf && window.perf.map);
+        if (elCid && elCid.value) window.MAP_STATE.city = elCid.value;
+        if (gmap && gmap.getZoom) window.MAP_STATE.zoom = gmap.getZoom();
+        // Recalcular canPolygons com valores atuais
+        var city = window.MAP_STATE.city || '';
+        var zoom = window.MAP_STATE.zoom || 0;
+        window.MAP_STATE.canPolygons = !!city && zoom >= 12;
+      }
       var ms = window.MAP_STATE;
       if (ms && ms.polygons === false && !ms.canPolygons) {
         cToast('Selecione uma cidade e zoom >= 12 para ver poligonos', 'warn');
