@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Estações -- Gestor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,600;0,700;1,300&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ------------------------------------------
+   TOKENS
+------------------------------------------ */
+:root{
+  --bg:      #F7F5F2;
+  --canvas:  #EEEAE5;
+  --panel:   #FFFFFF;
+  --border:  #DDD8D0;
+  --border2: #C8C2B8;
+  --ink:     #1A1714;
+  --ink2:    #5C5650;
+  --ink3:    #9E9890;
+  --accent:  #2D6A4F;
+  --accent2: #52B788;
+  --blue:    #2563EB;
+  --amber:   #B45309;
+  --red:     #B91C1C;
+  --purple:  #6D28D9;
+  --mono:    'JetBrains Mono', monospace;
+  --display: 'Fraunces', serif;
+  --body:    'Outfit', sans-serif;
+  --r:       10px;
+  --sh:      0 2px 12px rgba(0,0,0,.08);
+  --sh2:     0 8px 32px rgba(0,0,0,.12);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;-webkit-font-smoothing:antialiased}
+input,button,select,textarea{font:inherit;color:inherit;border:none;background:none;outline:none}
+button{cursor:pointer}
+
+/* ------------------------------------------
+   LOGIN
+------------------------------------------ */
+#loginScreen{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;
+}
+#loginScreen.hidden{display:none}
+.login-left{
+  width:420px;flex-shrink:0;
+  background:var(--ink);color:white;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:48px;
+}
+.login-logo{display:flex;align-items:center;gap:12px}
+.login-logo-mark{
+  width:36px;height:36px;background:var(--accent2);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+}
+.login-logo-mark svg{width:20px;height:20px;fill:var(--ink)}
+.login-logo-name{font-family:var(--display);font-size:18px;font-weight:600;color:white}
+.login-hero-text{
+  font-family:var(--display);font-size:38px;font-weight:300;line-height:1.2;
+  color:white;
+}
+.login-hero-text em{font-style:italic;color:var(--accent2)}
+.login-left-foot{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.3);letter-spacing:.1em}
+.login-right{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:48px;gap:28px;
+}
+.login-form-title{font-family:var(--display);font-size:28px;font-weight:600;text-align:center}
+.login-form-sub{font-size:14px;color:var(--ink2);text-align:center}
+.google-btn{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 28px;border-radius:var(--r);
+  background:var(--ink);color:white;
+  font-size:15px;font-weight:600;
+  box-shadow:var(--sh2);transition:.15s;
+  width:100%;max-width:300px;justify-content:center;
+}
+.google-btn:hover{background:#2D2926}
+.google-btn:active{transform:scale(.98)}
+.google-btn svg{width:20px;height:20px;flex-shrink:0}
+#loginError{
+  font-size:13px;color:var(--red);text-align:center;
+  background:rgba(185,28,28,.06);border:1px solid rgba(185,28,28,.15);
+  border-radius:8px;padding:10px 16px;display:none;
+}
+#loginError.visible{display:block}
+@media(max-width:768px){
+  .login-left{display:none}
+  .login-right{padding:32px 24px}
+}
+
+/* ------------------------------------------
+   LAYOUT
+------------------------------------------ */
+#app{width:100%;height:100%;display:flex;display:none}
+#app.visible{display:flex}
+
+/* SIDEBAR */
+#sidebar{
+  width:220px;flex-shrink:0;
+  background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.sb-head{
+  padding:20px 18px 16px;
+  border-bottom:1px solid var(--border);
+}
+.sb-brand{display:flex;align-items:center;gap:10px}
+.sb-mark{
+  width:30px;height:30px;background:var(--accent);border-radius:7px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.sb-mark svg{width:16px;height:16px;fill:white}
+.sb-name{font-family:var(--display);font-size:15px;font-weight:600;line-height:1.1}
+.sb-sub{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+.sb-user{
+  padding:12px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sb-avatar{
+  width:30px;height:30px;border-radius:50%;background:var(--canvas);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:13px;font-weight:600;color:var(--ink2);
+  flex-shrink:0;overflow:hidden;
+}
+.sb-avatar img{width:100%;height:100%;object-fit:cover}
+.sb-uname{font-size:12px;font-weight:600;line-height:1.2}
+.sb-urole{
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--accent);
+}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sb-section{
+  font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.12em;
+  text-transform:uppercase;padding:12px 18px 4px;
+}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 18px;color:var(--ink2);font-size:13px;
+  transition:.12s;cursor:pointer;border-left:2px solid transparent;
+  position:relative;
+}
+.sb-item:hover{background:var(--canvas);color:var(--ink)}
+.sb-item.active{
+  background:rgba(45,106,79,.06);color:var(--accent);
+  border-left-color:var(--accent);font-weight:600;
+}
+.sb-item svg{width:16px;height:16px;fill:currentColor;flex-shrink:0}
+.sb-badge{
+  margin-left:auto;min-width:18px;height:18px;border-radius:9px;
+  background:var(--red);color:white;
+  font-family:var(--mono);font-size:9px;padding:0 5px;
+  display:flex;align-items:center;justify-content:center;
+}
+.sb-badge.hidden{display:none}
+.sb-foot{
+  padding:12px 18px;border-top:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;
+}
+.sb-logout{
+  display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.06em;text-transform:uppercase;
+  padding:6px 10px;border-radius:6px;transition:.12s;width:100%;
+}
+.sb-logout:hover{background:var(--canvas);color:var(--red)}
+.sb-logout svg{width:14px;height:14px;fill:currentColor}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{
+  height:52px;flex-shrink:0;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;
+}
+.tb-title{font-family:var(--display);font-size:18px;font-weight:600}
+.tb-right{display:flex;align-items:center;gap:10px}
+.tb-btn{
+  display:flex;align-items:center;gap:6px;
+  padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;
+  border:1px solid var(--border);background:var(--panel);
+  color:var(--ink2);transition:.12s;
+}
+.tb-btn:hover{border-color:var(--border2);color:var(--ink)}
+.tb-btn svg{width:14px;height:14px;fill:currentColor}
+.tb-btn-primary{background:var(--accent);color:white;border-color:var(--accent)}
+.tb-btn-primary:hover{background:#235C43;border-color:#235C43;color:white}
+#content{flex:1;overflow-y:auto;overflow-x:hidden}
+
+/* ------------------------------------------
+   VIEWS
+------------------------------------------ */
+.view{display:none;flex-direction:column;height:100%}
+.view.active{display:flex}
+
+/* -- DASHBOARD -- */
+#dashView{padding:24px;gap:20px;overflow-y:auto}
+.dash-hello{font-family:var(--display);font-size:26px;font-weight:300;margin-bottom:2px}
+.dash-hello em{font-style:italic;color:var(--accent)}
+.dash-sub{font-size:13px;color:var(--ink2)}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.kpi-box{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px;position:relative;overflow:hidden;
+}
+.kpi-box::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  border-radius:var(--r) var(--r) 0 0;
+}
+.kpi-box.c-green::after{background:var(--accent2)}
+.kpi-box.c-blue::after{background:var(--blue)}
+.kpi-box.c-amber::after{background:var(--amber)}
+.kpi-box.c-purple::after{background:var(--purple)}
+.kpi-n{font-family:var(--display);font-size:36px;font-weight:600;line-height:1;margin-bottom:4px}
+.kpi-l{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase}
+.kpi-delta{font-size:12px;color:var(--accent2);margin-top:4px}
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+.chart-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.chart-title{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+.chart-wrap{position:relative;height:180px}
+.donut-legend{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.donut-item{display:flex;align-items:center;gap:8px;font-size:12px}
+.donut-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.donut-label{color:var(--ink2);flex:1}
+.donut-val{font-family:var(--mono);font-weight:500}
+.recent-table{width:100%;border-collapse:collapse}
+.recent-table th{
+  font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;
+  padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);
+}
+.recent-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+.recent-table tr:last-child td{border-bottom:none}
+.tipo-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:2px 8px;border-radius:4px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.04em;
+}
+.tp-PUBLICA{background:rgba(82,183,136,.12);color:var(--accent)}
+.tp-PRIVADA{background:rgba(37,99,235,.1);color:var(--blue)}
+.tp-CONCORRENTE{background:rgba(180,83,9,.1);color:var(--amber)}
+.status-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}
+.sd-ok{background:var(--accent2)}
+.sd-pend{background:var(--amber)}
+.sd-err{background:var(--red)}
+
+/* -- MAPA -- */
+#mapView{position:relative}
+#mapContainer{width:100%;height:100%}
+.leaflet-container{background:var(--canvas)}
+.map-controls{
+  position:absolute;top:14px;left:14px;z-index:1000;
+  display:flex;flex-direction:column;gap:8px;
+}
+.map-filter-panel{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px;
+  display:flex;flex-direction:column;gap:8px;
+  box-shadow:var(--sh2);min-width:200px;
+}
+.mf-title{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+.mf-row{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}
+.mf-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.mf-count{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--ink3)}
+.map-infobox{
+  position:absolute;bottom:14px;right:14px;z-index:1000;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px 16px;
+  box-shadow:var(--sh2);min-width:260px;max-width:320px;
+  display:none;
+}
+.map-infobox.visible{display:block}
+.ib-tipo{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.ib-addr{font-family:var(--display);font-size:15px;font-weight:600;margin-bottom:4px;line-height:1.3}
+.ib-meta{font-size:12px;color:var(--ink2);margin-bottom:10px}
+.ib-actions{display:flex;gap:8px}
+.ib-btn{
+  flex:1;padding:7px;border-radius:7px;font-size:11px;font-weight:600;
+  text-align:center;border:1px solid var(--border);color:var(--ink2);transition:.12s;
+}
+.ib-btn:hover{border-color:var(--border2);color:var(--ink)}
+.ib-btn-primary{background:var(--accent);color:white;border-color:var(--accent)}
+.ib-btn-primary:hover{background:#235C43;color:white}
+.ib-close{position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:4px;background:var(--canvas);display:flex;align-items:center;justify-content:center;color:var(--ink3)}
+.ib-close:hover{background:var(--border);color:var(--ink)}
+.map-stats-bar{
+  position:absolute;top:14px;right:14px;z-index:1000;
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 14px;
+  display:flex;gap:16px;align-items:center;
+  box-shadow:var(--sh);
+}
+.msb-item{text-align:center}
+.msb-n{font-family:var(--display);font-size:18px;font-weight:600;line-height:1}
+.msb-l{font-family:var(--mono);font-size:9px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+.msb-sep{width:1px;height:28px;background:var(--border)}
+
+/* -- ESTAÇÕES -- */
+#estView{flex-direction:column;overflow:hidden}
+.est-toolbar{
+  padding:14px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+  background:var(--panel);
+}
+.est-search{
+  display:flex;align-items:center;gap:8px;
+  background:var(--canvas);border:1px solid var(--border);border-radius:7px;
+  padding:8px 12px;flex:1;max-width:360px;
+}
+.est-search svg{width:14px;height:14px;fill:var(--ink3);flex-shrink:0}
+.est-search input{flex:1;font-size:13px;background:none}
+.est-search input::placeholder{color:var(--ink3)}
+.filter-select{
+  padding:8px 12px;border-radius:7px;font-size:12px;font-family:var(--mono);
+  background:var(--canvas);border:1px solid var(--border);color:var(--ink2);
+  cursor:pointer;
+}
+.est-count{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-left:auto}
+.est-table-wrap{flex:1;overflow-y:auto}
+.est-table{width:100%;border-collapse:collapse}
+.est-table thead th{
+  position:sticky;top:0;
+  font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;
+  padding:10px 16px;text-align:left;
+  background:var(--panel);border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.est-table tbody tr{transition:.1s;cursor:pointer}
+.est-table tbody tr:hover{background:var(--canvas)}
+.est-table tbody td{
+  padding:11px 16px;font-size:13px;
+  border-bottom:1px solid var(--border);
+  vertical-align:middle;
+}
+.est-table tbody tr:last-child td{border-bottom:none}
+.td-code{font-family:var(--mono);font-size:11px;color:var(--ink3)}
+.td-addr{font-weight:500;max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.td-foto{width:32px;height:32px;border-radius:5px;object-fit:cover;background:var(--canvas)}
+.td-actions{display:flex;gap:6px;justify-content:flex-end}
+.act-btn{
+  padding:5px 10px;border-radius:6px;font-size:11px;font-weight:600;
+  border:1px solid var(--border);color:var(--ink2);transition:.12s;white-space:nowrap;
+}
+.act-btn:hover{border-color:var(--border2);color:var(--ink)}
+.act-btn-croqui{background:var(--accent);color:white;border-color:var(--accent)}
+.act-btn-croqui:hover{background:#235C43;color:white}
+.act-btn-rel{background:var(--blue);color:white;border-color:var(--blue)}
+.act-btn-rel:hover{background:#1D4ED8;color:white}
+.est-empty{padding:60px;text-align:center;color:var(--ink3)}
+.est-empty svg{width:48px;height:48px;fill:var(--border);margin:0 auto 12px}
+.est-empty p{font-family:var(--display);font-size:16px;color:var(--ink2);margin-bottom:4px}
+
+/* -- USUÁRIOS -- */
+#usersView{flex-direction:column;overflow:hidden}
+.usr-toolbar{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--panel)}
+.usr-list{flex:1;overflow-y:auto;padding:16px 24px;display:flex;flex-direction:column;gap:8px}
+.usr-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px 16px;display:flex;align-items:center;gap:14px;
+  transition:.12s;
+}
+.usr-card:hover{border-color:var(--border2)}
+.usr-av{
+  width:36px;height:36px;border-radius:50%;background:var(--canvas);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:15px;font-weight:600;color:var(--ink2);
+  flex-shrink:0;
+}
+.usr-info{flex:1;min-width:0}
+.usr-name{font-size:14px;font-weight:600}
+.usr-email{font-size:12px;color:var(--ink2);font-family:var(--mono)}
+.usr-role-badge{
+  padding:3px 10px;border-radius:4px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  flex-shrink:0;
+}
+.rb-CAMPO{background:rgba(37,99,235,.08);color:var(--blue)}
+.rb-SUPERVISOR{background:rgba(109,40,217,.08);color:var(--purple)}
+.rb-OPERACOES{background:rgba(180,83,9,.08);color:var(--amber)}
+.rb-ADMIN{background:rgba(45,106,79,.1);color:var(--accent)}
+.rb-VIEWER{background:var(--canvas);color:var(--ink3)}
+.usr-city{font-family:var(--mono);font-size:10px;color:var(--ink3);flex-shrink:0}
+.usr-toggle{
+  width:36px;height:20px;border-radius:10px;
+  background:var(--border);position:relative;cursor:pointer;transition:.2s;flex-shrink:0;
+}
+.usr-toggle.on{background:var(--accent2)}
+.usr-toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;
+  background:white;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,.2);
+}
+.usr-toggle.on::after{left:18px}
+.usr-actions-btn{
+  padding:6px 12px;border-radius:6px;font-size:12px;
+  border:1px solid var(--border);color:var(--ink2);transition:.12s;
+}
+.usr-actions-btn:hover{border-color:var(--border2);color:var(--ink)}
+
+/* -- MODAL -- */
+#modal{
+  position:fixed;inset:0;z-index:800;
+  background:rgba(26,23,20,.5);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;opacity:0;pointer-events:none;transition:.25s;
+}
+#modal.visible{opacity:1;pointer-events:all}
+.modal-box{
+  background:var(--panel);border:1px solid var(--border);
+  border-radius:14px;width:100%;max-width:520px;max-height:85vh;
+  overflow-y:auto;box-shadow:var(--sh2);
+  transform:translateY(12px);transition:.25s;
+}
+#modal.visible .modal-box{transform:translateY(0)}
+.modal-head{
+  padding:20px 24px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-title{font-family:var(--display);font-size:18px;font-weight:600}
+.modal-close{
+  width:28px;height:28px;border-radius:6px;
+  background:var(--canvas);display:flex;align-items:center;justify-content:center;
+  color:var(--ink2);transition:.12s;
+}
+.modal-close:hover{background:var(--border);color:var(--ink)}
+.modal-close svg{width:14px;height:14px;fill:currentColor}
+.modal-body{padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.modal-foot{padding:14px 24px 20px;display:flex;gap:8px;justify-content:flex-end}
+.mf-field{display:flex;flex-direction:column;gap:5px}
+.mf-label{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase}
+.mf-input{
+  padding:10px 12px;border-radius:7px;font-size:13px;
+  background:var(--canvas);border:1px solid var(--border);
+  transition:.15s;width:100%;
+}
+.mf-input:focus{border-color:var(--accent);background:white}
+.mf-select{padding:10px 12px;border-radius:7px;font-size:13px;background:var(--canvas);border:1px solid var(--border);width:100%;cursor:pointer}
+.btn-cancel{padding:9px 18px;border-radius:7px;font-size:13px;border:1px solid var(--border);color:var(--ink2);transition:.12s}
+.btn-cancel:hover{border-color:var(--border2);color:var(--ink)}
+.btn-confirm{padding:9px 18px;border-radius:7px;font-size:13px;font-weight:600;background:var(--accent);color:white;transition:.12s}
+.btn-confirm:hover{background:#235C43}
+
+/* -- TOAST -- */
+#toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(12px);
+  z-index:900;background:var(--ink);color:white;border-radius:8px;
+  padding:10px 18px;font-size:13px;
+  opacity:0;transition:.2s;pointer-events:none;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.success{background:var(--accent)}
+#toast.error{background:var(--red)}
+
+/* -- LOADER -- */
+#loader{position:fixed;inset:0;z-index:9998;background:var(--bg);display:flex;align-items:center;justify-content:center;transition:.3s}
+#loader.out{opacity:0;pointer-events:none}
+.ld-ring{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* -- RESPONSIVE -- */
+@media(max-width:900px){
+  #sidebar{width:52px}
+  .sb-name,.sb-sub,.sb-uname,.sb-urole,.sb-section,.sb-item span,.sb-logout span{display:none}
+  .sb-item{justify-content:center;padding:12px}
+  .sb-badge{position:absolute;top:6px;right:6px;min-width:14px;height:14px;font-size:8px}
+  .sb-user,.sb-head{justify-content:center;padding:12px}
+  .sb-foot{padding:8px}
+  .sb-logout{justify-content:center}
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .charts-row{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader"><div class="ld-ring"></div></div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-left">
+    <div class="login-logo">
+      <div class="login-logo-mark">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      </div>
+      <div class="login-logo-name">Estações</div>
+    </div>
+    <div class="login-hero-text">Gestão de<br>estações<br><em>em campo.</em></div>
+    <div class="login-left-foot">Painel de Gestão · v2.0</div>
+  </div>
+  <div class="login-right">
+    <div>
+      <div class="login-form-title">Acesso restrito</div>
+      <div class="login-form-sub" style="margin-top:6px">Somente gestores e administradores autorizados</div>
+    </div>
+    <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:12px">
+      <input type="email" id="loginEmail" placeholder="seu@email.com"
+        style="padding:13px 14px;border-radius:10px;background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.15);font-size:14px;outline:none;width:100%">
+      <input type="password" id="loginSenha" placeholder="Senha"
+        style="padding:13px 14px;border-radius:10px;background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.15);font-size:14px;outline:none;width:100%">
+      <button id="loginBtn"
+        style="padding:14px;border-radius:10px;background:#111827;color:white;font-size:15px;font-weight:700;border:none;cursor:pointer;width:100%">
+        Entrar
+      </button>
+    </div>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sb-head">
+      <div class="sb-brand">
+        <div class="sb-mark">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </div>
+        <div><div class="sb-name">Estações</div><div class="sb-sub">Gestor</div></div>
+      </div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">G</div>
+      <div><div class="sb-uname" id="sbName">--</div><div class="sb-urole" id="sbRole">--</div></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-section">Principal</div>
+      <div class="sb-item active" data-view="dash" onclick="switchView(this)">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="sb-item" data-view="map" onclick="switchView(this)">
+        <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+        <span>Mapa</span>
+      </div>
+      <div class="sb-section">Gestão</div>
+      <div class="sb-item" data-view="est" onclick="switchView(this)">
+        <svg viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/></svg>
+        <span>Estações</span>
+        <div class="sb-badge hidden" id="badgePend">0</div>
+      </div>
+      <div class="sb-item" data-view="users" onclick="switchView(this)" id="usersNav" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <span>Usuários</span>
+      </div>
+    </nav>
+    <div class="sb-foot">
+      <button class="sb-logout" onclick="logout()">
+        <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+        <span>Sair</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <div class="tb-title" id="tbTitle">Dashboard</div>
+      <div class="tb-right" id="tbRight">
+        <button class="tb-btn" onclick="loadData()">
+          <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          Atualizar
+        </button>
+        <button class="tb-btn tb-btn-primary" id="tbActionBtn" onclick="tbAction()">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14l-5-5 1.41-1.41L12 14.17l7.59-7.59L21 8l-9 9z"/></svg>
+          <span id="tbActionLabel">Exportar</span>
+        </button>
+      </div>
+    </div>
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div class="view active" id="dashView">
+        <div class="dash-hello">Olá, <em id="dashName">Gestor</em></div>
+        <div class="dash-sub" id="dashSub">Carregando dados...</div>
+
+        <div class="kpi-row">
+          <div class="kpi-box c-green">
+            <div class="kpi-n" id="kpiTotal">--</div>
+            <div class="kpi-l">Total de estações</div>
+            <div class="kpi-delta" id="kpiTotalDelta"></div>
+          </div>
+          <div class="kpi-box c-blue">
+            <div class="kpi-n" id="kpiPub">--</div>
+            <div class="kpi-l">Públicas</div>
+          </div>
+          <div class="kpi-box c-amber">
+            <div class="kpi-n" id="kpiPriv">--</div>
+            <div class="kpi-l">Privadas</div>
+          </div>
+          <div class="kpi-box c-purple">
+            <div class="kpi-n" id="kpiConc">--</div>
+            <div class="kpi-l">Concorrentes</div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-box">
+            <div class="chart-title">Cadastros -- últimos 30 dias</div>
+            <div class="chart-wrap"><canvas id="chartLine"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-title">Distribuição por tipo</div>
+            <div class="chart-wrap"><canvas id="chartDonut"></canvas></div>
+            <div class="donut-legend" id="donutLegend"></div>
+          </div>
+        </div>
+
+        <div class="chart-box" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:18px">
+          <div class="chart-title">Últimos cadastros</div>
+          <table class="recent-table">
+            <thead>
+              <tr>
+                <th>Código</th><th>Endereço</th><th>Tipo</th><th>Status</th><th>Data</th>
+              </tr>
+            </thead>
+            <tbody id="recentBody">
+              <tr><td colspan="5" style="text-align:center;color:var(--ink3);padding:20px">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MAPA -->
+      <div class="view" id="mapView">
+        <div id="mapContainer"></div>
+        <div class="map-controls">
+          <div class="map-filter-panel">
+            <div class="mf-title">Filtrar camadas</div>
+            <label class="mf-row"><input type="checkbox" checked onchange="toggleLayer('PUBLICA',this.checked)"> <div class="mf-dot" style="background:#52B788"></div> Pública <span class="mf-count" id="cntPub">0</span></label>
+            <label class="mf-row"><input type="checkbox" checked onchange="toggleLayer('PRIVADA',this.checked)"> <div class="mf-dot" style="background:#2563EB"></div> Privada <span class="mf-count" id="cntPriv">0</span></label>
+            <label class="mf-row"><input type="checkbox" checked onchange="toggleLayer('CONCORRENTE',this.checked)"> <div class="mf-dot" style="background:#B45309"></div> Concorrente <span class="mf-count" id="cntConc">0</span></label>
+          </div>
+        </div>
+        <div class="map-stats-bar">
+          <div class="msb-item"><div class="msb-n" id="mapTotal">--</div><div class="msb-l">Total</div></div>
+          <div class="msb-sep"></div>
+          <div class="msb-item"><div class="msb-n" id="mapVis">--</div><div class="msb-l">Visíveis</div></div>
+        </div>
+        <div class="map-infobox" id="mapInfobox">
+          <button class="ib-close" onclick="document.getElementById('mapInfobox').classList.remove('visible')">
+            <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+          </button>
+          <div class="ib-tipo" id="ibTipo"></div>
+          <div class="ib-addr" id="ibAddr"></div>
+          <div class="ib-meta" id="ibMeta"></div>
+          <div class="ib-actions">
+            <button class="ib-btn ib-btn-primary" id="ibBtnCroqui">Gerar Croqui</button>
+            <button class="ib-btn" id="ibBtnRel">Rel. Técnico</button>
+            <button class="ib-btn" id="ibBtnEdit">Editar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESTAÇÕES -->
+      <div class="view" id="estView">
+        <div class="est-toolbar">
+          <div class="est-search">
+            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+            <input type="text" placeholder="Buscar por endereço, código, bairro..." id="estSearch" oninput="filterEst()">
+          </div>
+          <select class="filter-select" id="estFilterTipo" onchange="filterEst()">
+            <option value="">Todos os tipos</option>
+            <option value="PUBLICA">Pública</option>
+            <option value="PRIVADA">Privada</option>
+            <option value="CONCORRENTE">Concorrente</option>
+          </select>
+          <select class="filter-select" id="estFilterCidade" onchange="filterEst()">
+            <option value="">Todas as cidades</option>
+          </select>
+          <div class="est-count" id="estCount">-- estações</div>
+        </div>
+        <div class="est-table-wrap">
+          <table class="est-table">
+            <thead>
+              <tr>
+                <th></th><th>Código</th><th>Endereço</th><th>Tipo</th>
+                <th>Bairro</th><th>Cidade</th><th>Status</th><th style="text-align:right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="estBody">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--ink3)">Carregando estações...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- USUÁRIOS -->
+      <div class="view" id="usersView">
+        <div class="usr-toolbar">
+          <button class="tb-btn tb-btn-primary" onclick="openModalNovoUsuario()">
+            <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:white"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            Novo usuário
+          </button>
+          <div style="margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink3)" id="usersCount">--</div>
+        </div>
+        <div class="usr-list" id="usersList">
+          <div style="text-align:center;padding:40px;color:var(--ink3)">Carregando usuários...</div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- MODAL -->
+<div id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modalBox">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">Título</div>
+      <button class="modal-close" onclick="closeModal()">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ---------------------------------------
+   CONFIG
+--------------------------------------- */
+var CFG = {
+  BACKEND_URL:      'https://script.google.com/macros/s/AKfycbzV1R7PTCpE7SvB7uxO4d2N83bZbt0NjQ5d-6kONuv72XTTT5G8Jmg0lgkbOueMnji9/exec',
+  GOOGLE_CLIENT_ID: '337567650924-a16v6esls9fnsu323ndkt1le7abk3pgu.apps.googleusercontent.com'
+};
+
+/* ---------------------------------------
+   STATE
+--------------------------------------- */
+var S = {
+  user:      null,
+  estacoes:  [],
+  filtered:  [],
+  usuarios:  [],
+  mapInst:   null,
+  layers:    { PUBLICA: true, PRIVADA: true, CONCORRENTE: true },
+  markers:   [],
+  selEst:    null,  // estação selecionada no mapa/tabela
+  charts:    {}
+};
+
+/* ---------------------------------------
+   BACKEND
+--------------------------------------- */
+function api(action, payload) {
+  var url = CFG.BACKEND_URL
+    + '?action=' + encodeURIComponent(action)
+    + '&d='      + encodeURIComponent(JSON.stringify(payload || {}));
+  return fetch(url, { method: 'GET' })
+    .then(function(r) { return r.json(); });
+}
+
+/* ---------------------------------------
+   AUTH
+--------------------------------------- */
+function initAuth() {
+  showLogin();
+  var emailEl = document.getElementById('loginEmail');
+  var senhaEl = document.getElementById('loginSenha');
+  var btnEl   = document.getElementById('loginBtn');
+
+  function doLogin() {
+    var email = (emailEl.value || '').trim().toLowerCase();
+    var senha = (senhaEl.value || '').trim();
+    if (!email || !senha) { showErr('Informe e-mail e senha.'); return; }
+    btnEl.disabled = true; btnEl.textContent = 'Entrando...';
+    api('loginGestor', { email: email, senha: senha })
+      .then(function(res) {
+        btnEl.disabled = false; btnEl.textContent = 'Entrar';
+        if (!res || !res.ok) { showErr(res && res.error ? res.error : 'E-mail ou senha incorretos.'); return; }
+        var roles = ['SUPERVISOR','OPERACOES','ADMIN'];
+        if (roles.indexOf(res.role) === -1) {
+          showErr('Perfil ' + res.role + ' sem acesso. Use o app de campo.'); return;
+        }
+        S.user = res;
+        sessionStorage.setItem('gest_sess', JSON.stringify(S.user));
+        startApp();
+      })
+      .catch(function(e) {
+        btnEl.disabled = false; btnEl.textContent = 'Entrar';
+        showErr('Erro: ' + String(e));
+      });
+  }
+
+  if (btnEl)   btnEl.onclick = doLogin;
+  if (senhaEl) senhaEl.onkeydown = function(e) { if (e.key === 'Enter') doLogin(); };
+  if (emailEl) emailEl.onkeydown = function(e) { if (e.key === 'Enter') senhaEl && senhaEl.focus(); };
+}
+
+function onGoogleLogin(resp) { /* nao usado */ }
+
+function restoreSession() {
+  try {
+    var raw = sessionStorage.getItem('gest_sess');
+    if (raw) { S.user = JSON.parse(raw); return true; }
+  } catch(e) {}
+  return false;
+}
+
+function showLogin() {
+  document.getElementById('loader').classList.add('out');
+  document.getElementById('loginScreen').classList.remove('hidden');
+}
+function showErr(msg) {
+  var el = document.getElementById('loginError');
+  el.textContent = msg; el.classList.add('visible');
+}
+document.getElementById('googleLoginBtn').onclick = function() {
+  if (typeof google !== 'undefined') google.accounts.id.prompt();
+};
+function logout() {
+  sessionStorage.removeItem('gest_sess');
+  location.reload();
+}
+
+/* ---------------------------------------
+   START
+--------------------------------------- */
+function startApp() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('loader').classList.add('out');
+
+  // Sidebar user
+  var ini = (S.user.nome||'G').charAt(0).toUpperCase();
+  document.getElementById('sbAvatar').textContent = ini;
+  document.getElementById('sbName').textContent = (S.user.nome||'').split(' ')[0];
+  document.getElementById('sbRole').textContent = S.user.role;
+  document.getElementById('dashName').textContent = (S.user.nome||'Gestor').split(' ')[0];
+
+  // Mostrar menu Usuários só para ADMIN
+  if (S.user.role === 'ADMIN') {
+    document.getElementById('usersNav').style.display = 'flex';
+  }
+
+  loadData();
+}
+
+/* ---------------------------------------
+   DATA
+--------------------------------------- */
+function loadData() {
+  api('getEstacoesWebApp',{}).then(function(res) {
+    var list = Array.isArray(res) ? res : (res.estacoes || []);
+    S.estacoes = list;
+    S.filtered = list;
+    buildDash();
+    buildMapMarkers();
+    buildEstTable(list);
+    buildCidadeFilter(list);
+    var pend = list.filter(function(e){ return e.statusEstacao === 'SOLICITADO' || e.statusEstacao === 'PENDENTE'; }).length;
+    if (pend > 0) {
+      var b = document.getElementById('badgePend');
+      b.textContent = pend; b.classList.remove('hidden');
+    }
+  }).catch(function(e){ showToast('Erro ao carregar estações: ' + e, 'error'); });
+
+  if (S.user.role === 'ADMIN') {
+    api('listarUsuarios', { tokenId: S.user.tokenId }).then(function(res) {
+      if (Array.isArray(res)) { S.usuarios = res; buildUsersView(); }
+    });
+  }
+}
+
+/* ---------------------------------------
+   DASHBOARD
+--------------------------------------- */
+function buildDash() {
+  var list = S.estacoes;
+  var tot  = list.length;
+  var pub  = list.filter(function(e){ return e.tipo === 'PUBLICA'; }).length;
+  var priv = list.filter(function(e){ return e.tipo === 'PRIVADA'; }).length;
+  var conc = list.filter(function(e){ return e.tipo === 'CONCORRENTE'; }).length;
+
+  setText('kpiTotal', tot);
+  setText('kpiPub',   pub);
+  setText('kpiPriv',  priv);
+  setText('kpiConc',  conc);
+
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var hoje7 = new Date(hoje); hoje7.setDate(hoje7.getDate()-7);
+  var recentes = list.filter(function(e){ return e.createdAt && new Date(e.createdAt) >= hoje7; });
+  document.getElementById('dashSub').textContent =
+    tot + ' estações · ' + recentes.length + ' cadastradas nos últimos 7 dias';
+
+  buildChartLine(list);
+  buildChartDonut(pub, priv, conc);
+  buildRecentTable(list);
+}
+
+function buildChartLine(list) {
+  var ctx = document.getElementById('chartLine').getContext('2d');
+  if (S.charts.line) { S.charts.line.destroy(); }
+
+  // Últimos 30 dias
+  var days = 30, labels = [], counts = [];
+  for (var i = days-1; i >= 0; i--) {
+    var d = new Date(); d.setDate(d.getDate()-i); d.setHours(0,0,0,0);
+    var next = new Date(d); next.setDate(next.getDate()+1);
+    labels.push((d.getDate()) + '/' + (d.getMonth()+1));
+    counts.push(list.filter(function(e){
+      var c = e.createdAt ? new Date(e.createdAt) : null;
+      return c && c >= d && c < next;
+    }).length);
+  }
+
+  S.charts.line = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: labels,
+      datasets:[{
+        data: counts,
+        borderColor:'#2D6A4F',
+        backgroundColor:'rgba(45,106,79,.08)',
+        tension:.4, fill:true, pointRadius:0, borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{ ticks:{ font:{family:'JetBrains Mono',size:9}, color:'#9E9890', maxTicksLimit:8 }, grid:{display:false} },
+        y:{ ticks:{ font:{family:'JetBrains Mono',size:9}, color:'#9E9890' }, grid:{color:'#DDD8D0'}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function buildChartDonut(pub, priv, conc) {
+  var ctx = document.getElementById('chartDonut').getContext('2d');
+  if (S.charts.donut) { S.charts.donut.destroy(); }
+
+  S.charts.donut = new Chart(ctx, {
+    type:'doughnut',
+    data:{
+      labels:['Pública','Privada','Concorrente'],
+      datasets:[{
+        data:[pub,priv,conc],
+        backgroundColor:['#52B788','#2563EB','#B45309'],
+        borderWidth:0, hoverOffset:4
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'72%',
+      plugins:{ legend:{ display:false } }
+    }
+  });
+
+  var leg = document.getElementById('donutLegend');
+  var total = pub+priv+conc || 1;
+  var items = [['Pública',pub,'#52B788'],['Privada',priv,'#2563EB'],['Concorrente',conc,'#B45309']];
+  leg.innerHTML = items.map(function(it){
+    return '<div class="donut-item"><div class="donut-dot" style="background:'+it[2]+'"></div>'
+      +'<span class="donut-label">'+it[0]+'</span>'
+      +'<span class="donut-val">'+it[1]+' <span style="color:var(--ink3);font-weight:400">('
+      +Math.round(it[1]/total*100)+'%)</span></span></div>';
+  }).join('');
+}
+
+function buildRecentTable(list) {
+  var recentes = list.slice().sort(function(a,b){
+    return (b.createdAt||0) - (a.createdAt||0);
+  }).slice(0,10);
+  var body = document.getElementById('recentBody');
+  if (!recentes.length) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--ink3)">Sem dados</td></tr>';
+    return;
+  }
+  body.innerHTML = recentes.map(function(e){
+    var dt = e.createdAt ? new Date(e.createdAt) : null;
+    var dts = dt ? (pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+' '+pad(dt.getHours())+':'+pad(dt.getMinutes())) : '--';
+    var sdot = 'sd-ok';
+    if (e.statusEstacao === 'SOLICITADO' || e.statusEstacao === 'PENDENTE') sdot = 'sd-pend';
+    return '<tr onclick="openEstDetalhe(\''+esc(e.codigo)+'\')" style="cursor:pointer">'
+      +'<td class="td-code">'+esc(e.codigo||'--')+'</td>'
+      +'<td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(e.endereco||'--')+'</td>'
+      +'<td><span class="tipo-pill tp-'+e.tipo+'">'+esc(e.tipo||'--')+'</span></td>'
+      +'<td><span class="status-dot '+sdot+'"></span>'+esc(e.statusEstacao||'--')+'</td>'
+      +'<td style="font-family:var(--mono);font-size:11px;color:var(--ink3)">'+dts+'</td>'
+      +'</tr>';
+  }).join('');
+}
+
+/* ---------------------------------------
+   MAPA
+--------------------------------------- */
+function initMap() {
+  if (S.mapInst) return;
+  S.mapInst = L.map('mapContainer', {
+    center: [-23.55, -46.63], zoom: 11,
+    zoomControl: true
+  });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '© OpenStreetMap'
+  }).addTo(S.mapInst);
+}
+
+function buildMapMarkers() {
+  if (!S.mapInst) initMap();
+  // Limpar marcadores existentes
+  S.markers.forEach(function(m){ S.mapInst.removeLayer(m); });
+  S.markers = [];
+
+  var colors = { PUBLICA:'#52B788', PRIVADA:'#2563EB', CONCORRENTE:'#B45309' };
+  var counts  = { PUBLICA:0, PRIVADA:0, CONCORRENTE:0 };
+
+  S.estacoes.forEach(function(e) {
+    if (!e.lat || !e.lng) return;
+    var cor   = colors[e.tipo] || '#9E9890';
+    var icon  = L.divIcon({
+      html: '<div style="width:12px;height:12px;background:'+cor+';border:2px solid white;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,.3)"></div>',
+      iconSize:[12,12], iconAnchor:[6,6], className:''
+    });
+    var m = L.marker([e.lat, e.lng], { icon:icon });
+    m._estData = e;
+    m.on('click', function() { openMapInfobox(e); });
+    if (S.layers[e.tipo] !== false) m.addTo(S.mapInst);
+    S.markers.push(m);
+    if (counts[e.tipo] !== undefined) counts[e.tipo]++;
+  });
+
+  setText('cntPub',  counts.PUBLICA);
+  setText('cntPriv', counts.PRIVADA);
+  setText('cntConc', counts.CONCORRENTE);
+  setText('mapTotal', S.estacoes.length);
+  setText('mapVis',   S.markers.filter(function(m){ return S.mapInst.hasLayer(m); }).length);
+}
+
+function toggleLayer(tipo, visible) {
+  S.layers[tipo] = visible;
+  S.markers.forEach(function(m) {
+    if (m._estData && m._estData.tipo === tipo) {
+      if (visible) m.addTo(S.mapInst);
+      else S.mapInst.removeLayer(m);
+    }
+  });
+  setText('mapVis', S.markers.filter(function(m){ return S.mapInst.hasLayer(m); }).length);
+}
+
+function openMapInfobox(e) {
+  S.selEst = e;
+  var box = document.getElementById('mapInfobox');
+  setText('ibTipo', e.tipo);
+  setText('ibAddr', e.endereco || e.bairro || '--');
+  setText('ibMeta', [e.bairro, e.cidade].filter(Boolean).join(' · ') + (e.statusEstacao ? ' · ' + e.statusEstacao : ''));
+  document.getElementById('ibBtnCroqui').style.display = e.tipo !== 'CONCORRENTE' ? 'flex' : 'none';
+  document.getElementById('ibBtnRel').textContent = e.tipo === 'PRIVADA' ? 'Rel. Técnico' : 'Detalhes';
+  box.classList.add('visible');
+}
+document.getElementById('ibBtnCroqui').onclick = function() { if (S.selEst) gerarCroqui(S.selEst.codigo); };
+document.getElementById('ibBtnRel').onclick    = function() { if (S.selEst) openEstDetalhe(S.selEst.codigo); };
+document.getElementById('ibBtnEdit').onclick   = function() { if (S.selEst) openModalEditEst(S.selEst); };
+
+/* ---------------------------------------
+   ESTAÇÕES TABLE
+--------------------------------------- */
+function buildCidadeFilter(list) {
+  var cidades = {};
+  list.forEach(function(e){ if(e.cidade) cidades[e.cidade] = true; });
+  var sel = document.getElementById('estFilterCidade');
+  Object.keys(cidades).sort().forEach(function(c){
+    var opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+
+function filterEst() {
+  var q   = (document.getElementById('estSearch').value||'').toLowerCase();
+  var tip = document.getElementById('estFilterTipo').value;
+  var cid = document.getElementById('estFilterCidade').value;
+
+  S.filtered = S.estacoes.filter(function(e) {
+    if (tip && e.tipo !== tip) return false;
+    if (cid && e.cidade !== cid) return false;
+    if (q) {
+      var hay = [e.codigo,e.endereco,e.bairro,e.cidade].join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) return false;
+    }
+    return true;
+  });
+  buildEstTable(S.filtered);
+}
+
+function buildEstTable(list) {
+  var body = document.getElementById('estBody');
+  setText('estCount', list.length + (list.length === 1 ? ' estação' : ' estações'));
+
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="est-empty"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg><p>Nenhuma estação</p><span>Ajuste os filtros</span></div></td></tr>';
+    return;
+  }
+
+  body.innerHTML = list.slice(0, 200).map(function(e) {
+    var sdot = (e.statusEstacao === 'SOLICITADO'||e.statusEstacao === 'PENDENTE') ? 'sd-pend' : 'sd-ok';
+    var fotoEl = e.foto
+      ? '<img class="td-foto" src="'+esc(e.foto)+'" onerror="this.style.display=\'none\'">'
+      : '<div class="td-foto"></div>';
+
+    var actions = '';
+    if (e.tipo !== 'CONCORRENTE') {
+      actions += '<button class="act-btn act-btn-croqui" onclick="event.stopPropagation();gerarCroqui(\''+esc(e.codigo)+'\')">Croqui</button>';
+    }
+    if (e.tipo === 'PRIVADA') {
+      actions += '<button class="act-btn act-btn-rel" onclick="event.stopPropagation();gerarRelatorio(\''+esc(e.codigo)+'\')">Relatório</button>';
+    }
+    actions += '<button class="act-btn" onclick="event.stopPropagation();openModalEditEst(getEst(\''+esc(e.codigo)+'\'))">Editar</button>';
+
+    return '<tr onclick="openEstDetalhe(\''+esc(e.codigo)+'\')">'
+      +'<td>'+fotoEl+'</td>'
+      +'<td class="td-code">'+esc(e.codigo||'--')+'</td>'
+      +'<td class="td-addr">'+esc(e.endereco||'--')+'</td>'
+      +'<td><span class="tipo-pill tp-'+e.tipo+'">'+esc(e.tipo||'--')+'</span></td>'
+      +'<td>'+esc(e.bairro||'--')+'</td>'
+      +'<td>'+esc(e.cidade||'--')+'</td>'
+      +'<td><span class="status-dot '+sdot+'"></span>'+esc(e.statusEstacao||'--')+'</td>'
+      +'<td><div class="td-actions">'+actions+'</div></td>'
+      +'</tr>';
+  }).join('');
+}
+
+function getEst(codigo) {
+  return S.estacoes.filter(function(e){ return e.codigo === codigo; })[0] || null;
+}
+
+/* ---------------------------------------
+   CROQUI / RELATÓRIO
+--------------------------------------- */
+function gerarCroqui(codigo) {
+  openModal('Gerar Croqui',
+    '<p style="font-size:14px;color:var(--ink2);line-height:1.6">Confirma a geração do croqui para a estação <strong>'+esc(codigo)+'</strong>?<br>O processo pode levar alguns instantes.</p>',
+    [
+      { label:'Cancelar', cls:'btn-cancel', action:'closeModal()' },
+      { label:'Gerar',    cls:'btn-confirm', action:'confirmarGerarCroqui("'+esc(codigo)+'")' }
+    ]
+  );
+}
+
+function confirmarGerarCroqui(codigo) {
+  closeModal();
+  showToast('Croqui enfileirado para ' + codigo, 'success');
+  api('gerarCroquiPorCodigo', { tokenId: S.user.tokenId, codigo: codigo })
+    .then(function(res) {
+      showToast(res.ok ? 'Croqui gerado com sucesso' : 'Erro: ' + res.error, res.ok ? 'success' : 'error');
+    }).catch(function(e){ showToast('Erro: ' + e, 'error'); });
+}
+
+function gerarRelatorio(codigo) {
+  showToast('Gerando relatório técnico para ' + codigo, 'success');
+  api('gerarRelatorioTecnico', { tokenId: S.user.tokenId, codigo: codigo })
+    .then(function(res) {
+      if (res.ok && res.url) {
+        window.open(res.url, '_blank');
+      } else {
+        showToast('Erro: ' + (res.error||'Falha'), 'error');
+      }
+    }).catch(function(e){ showToast('Erro: ' + e, 'error'); });
+}
+
+/* ---------------------------------------
+   DETALHE ESTAÇÃO
+--------------------------------------- */
+function openEstDetalhe(codigo) {
+  var e = getEst(codigo);
+  if (!e) return;
+
+  var rows = [
+    ['Código', e.codigo],
+    ['Endereço', e.endereco],
+    ['Bairro', e.bairro],
+    ['Cidade', e.cidade],
+    ['Tipo', e.tipo],
+    ['Status', e.statusEstacao],
+    ['Subprefeitura', e.subprefeitura],
+    ['Coordenadas', e.lat && e.lng ? e.lat.toFixed(5)+', '+e.lng.toFixed(5) : '--'],
+    e.nomeLocalPrivado ? ['Local privado', e.nomeLocalPrivado] : null,
+    e.nomeAutorizante  ? ['Autorizante',   e.nomeAutorizante]  : null,
+  ].filter(Boolean);
+
+  var fotoHtml = e.foto
+    ? '<img src="'+esc(e.foto)+'" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:12px">'
+    : '';
+  var rowsHtml = rows.map(function(r){
+    return '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<span style="font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase">'+esc(r[0])+'</span>'
+      +'<span style="font-size:13px;font-weight:500;text-align:right">'+esc(r[1]||'--')+'</span></div>';
+  }).join('');
+
+  var btns = [{ label:'Fechar', cls:'btn-cancel', action:'closeModal()' }];
+  if (e.tipo !== 'CONCORRENTE')
+    btns.push({ label:'Gerar Croqui', cls:'btn-confirm', action:'closeModal();gerarCroqui("'+esc(e.codigo)+'")' });
+  if (e.tipo === 'PRIVADA')
+    btns.push({ label:'Rel. Técnico', cls:'btn-confirm', action:'closeModal();gerarRelatorio("'+esc(e.codigo)+'")' });
+
+  openModal('Estação ' + (e.codigo||''), fotoHtml + rowsHtml, btns);
+}
+
+/* ---------------------------------------
+   EDIT ESTAÇÃO
+--------------------------------------- */
+function openModalEditEst(e) {
+  if (!e) return;
+  var body = [
+    '<div class="mf-field"><div class="mf-label">Status</div>',
+    '<select class="mf-select" id="editStatus">',
+    ['SOLICITADO','ATIVO','APROVADO','REJEITADO','CANCELADO'].map(function(s){
+      return '<option value="'+s+'"'+(e.statusEstacao===s?' selected':'')+'>'+s+'</option>';
+    }).join(''),
+    '</select></div>',
+    '<div class="mf-field"><div class="mf-label">Observação</div>',
+    '<textarea class="mf-input" id="editObs" rows="3" placeholder="Motivo / observação..."></textarea></div>'
+  ].join('');
+
+  openModal('Editar · ' + e.codigo, body, [
+    { label:'Cancelar', cls:'btn-cancel', action:'closeModal()' },
+    { label:'Salvar', cls:'btn-confirm', action:'salvarEdicaoEst("'+esc(e.codigo)+'")' }
+  ]);
+}
+
+function salvarEdicaoEst(codigo) {
+  var status = document.getElementById('editStatus').value;
+  var obs    = document.getElementById('editObs').value;
+  var e = getEst(codigo);
+  if (!e) return;
+
+  api('updateStatusEstacao', {
+    tokenId:    S.user.tokenId,
+    rowKey:     e.rowKey || codigo,
+    novoStatus: status,
+    obs:        obs
+  }).then(function(res){
+    closeModal();
+    showToast(res.ok ? 'Status atualizado' : 'Erro: '+res.error, res.ok ? 'success' : 'error');
+    if (res.ok) loadData();
+  });
+}
+
+/* ---------------------------------------
+   USUÁRIOS
+--------------------------------------- */
+function buildUsersView() {
+  var list  = document.getElementById('usersList');
+  var count = document.getElementById('usersCount');
+  setText('usersCount', S.usuarios.length + ' usuários');
+
+  if (!S.usuarios.length) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--ink3)">Nenhum usuário cadastrado</div>';
+    return;
+  }
+
+  list.innerHTML = S.usuarios.map(function(u) {
+    var ini = (u.nome||u.email||'?').charAt(0).toUpperCase();
+    return '<div class="usr-card">'
+      +'<div class="usr-av">'+ini+'</div>'
+      +'<div class="usr-info">'
+      +'<div class="usr-name">'+esc(u.nome||'--')+'</div>'
+      +'<div class="usr-email">'+esc(u.email||'--')+'</div>'
+      +'</div>'
+      +'<span class="usr-role-badge rb-'+u.role+'">'+esc(u.role)+'</span>'
+      +'<span class="usr-city">'+esc(u.cidade||'--')+'</span>'
+      +'<div class="usr-toggle '+(u.ativo?'on':'')+'" onclick="toggleUsuario(\''+esc(u.email)+'\','+(!u.ativo)+')" title="'+(u.ativo?'Ativo':'Inativo')+'"></div>'
+      +'<button class="usr-actions-btn" onclick="openModalEditUser(\''+esc(u.email)+'\')">Editar</button>'
+      +'</div>';
+  }).join('');
+}
+
+function openModalNovoUsuario() {
+  openModal('Novo Usuário',
+    buildUserForm({}),
+    [
+      { label:'Cancelar', cls:'btn-cancel', action:'closeModal()' },
+      { label:'Criar', cls:'btn-confirm', action:'submitUser(null)' }
+    ]
+  );
+}
+
+function openModalEditUser(email) {
+  var u = S.usuarios.filter(function(x){ return x.email === email; })[0];
+  if (!u) return;
+  openModal('Editar Usuário',
+    buildUserForm(u),
+    [
+      { label:'Cancelar', cls:'btn-cancel', action:'closeModal()' },
+      { label:'Salvar', cls:'btn-confirm', action:'submitUser("'+esc(email)+'")' }
+    ]
+  );
+}
+
+function buildUserForm(u) {
+  return [
+    '<div class="mf-field"><div class="mf-label">Email</div><input class="mf-input" id="uf-email" type="email" value="'+esc(u.email||'')+'" '+(u.email?'disabled':'')+' placeholder="email@empresa.com"></div>',
+    '<div class="mf-field"><div class="mf-label">Nome</div><input class="mf-input" id="uf-nome" value="'+esc(u.nome||'')+'" placeholder="Nome completo"></div>',
+    '<div class="mf-field"><div class="mf-label">Role</div><select class="mf-select" id="uf-role">'+
+      ['CAMPO','SUPERVISOR','OPERACOES','ADMIN','VIEWER'].map(function(r){
+        return '<option value="'+r+'"'+(u.role===r?' selected':'')+'>'+r+'</option>';
+      }).join('')+'</select></div>',
+    '<div class="mf-field"><div class="mf-label">Cidade</div><input class="mf-input" id="uf-cidade" value="'+esc(u.cidade||'')+'" placeholder="São Paulo"></div>',
+    '<div class="mf-field"><div class="mf-label">País</div><select class="mf-select" id="uf-pais"><option value="BR"'+(u.pais!=='MX'?' selected':'')+'>BR</option><option value="MX"'+(u.pais==='MX'?' selected':'')+'>MX</option></select></div>',
+  ].join('');
+}
+
+function submitUser(emailOriginal) {
+  var dados = {
+    email:  (document.getElementById('uf-email').value||'').trim(),
+    nome:   (document.getElementById('uf-nome').value||'').trim(),
+    role:   document.getElementById('uf-role').value,
+    cidade: (document.getElementById('uf-cidade').value||'').trim(),
+    pais:   document.getElementById('uf-pais').value,
+    ativo:  true
+  };
+  if (!dados.email) { showToast('Email obrigatório','error'); return; }
+
+  api('salvarUsuario', { tokenId: S.user.tokenId, usuario: dados }).then(function(res){
+    closeModal();
+    showToast(res.ok ? 'Usuário salvo com sucesso' : 'Erro: '+res.error, res.ok ? 'success' : 'error');
+    if (res.ok) {
+      api('listarUsuarios', { tokenId: S.user.tokenId }).then(function(r){
+        if (Array.isArray(r)) { S.usuarios = r; buildUsersView(); }
+      });
+    }
+  });
+}
+
+function toggleUsuario(email, ativo) {
+  var u = S.usuarios.filter(function(x){ return x.email === email; })[0];
+  if (!u) return;
+  api('salvarUsuario', { tokenId: S.user.tokenId, usuario: Object.assign({}, u, { ativo: ativo }) }).then(function(res){
+    showToast(res.ok ? (ativo ? 'Usuário ativado' : 'Usuário desativado') : 'Erro: '+res.error, res.ok ? 'success' : 'error');
+    if (res.ok) u.ativo = ativo;
+    buildUsersView();
+  });
+}
+
+/* ---------------------------------------
+   NAV
+--------------------------------------- */
+function switchView(el) {
+  var view = el.dataset.view;
+  document.querySelectorAll('.sb-item').forEach(function(i){ i.classList.remove('active'); });
+  el.classList.add('active');
+
+  document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+  var titles = { dash:'Dashboard', map:'Mapa de Estações', est:'Estações', users:'Usuários' };
+  var actions = { dash:'Exportar', map:'Fullscreen', est:'Exportar CSV', users:'Novo usuário' };
+
+  switch(view) {
+    case 'dash':   document.getElementById('dashView').classList.add('active'); break;
+    case 'map':
+      document.getElementById('mapView').classList.add('active');
+      setTimeout(function(){
+        if (!S.mapInst) initMap();
+        S.mapInst.invalidateSize();
+        buildMapMarkers();
+      }, 100);
+      break;
+    case 'est':    document.getElementById('estView').classList.add('active');  break;
+    case 'users':  document.getElementById('usersView').classList.add('active'); break;
+  }
+  setText('tbTitle', titles[view]||'');
+  setText('tbActionLabel', actions[view]||'');
+}
+
+function tbAction() {
+  var active = document.querySelector('.sb-item.active');
+  if (!active) return;
+  var view = active.dataset.view;
+  if (view === 'est' || view === 'dash') exportCSV();
+  if (view === 'map') {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.getElementById('mapContainer').requestFullscreen && document.getElementById('mapContainer').requestFullscreen();
+  }
+  if (view === 'users') openModalNovoUsuario();
+}
+
+function exportCSV() {
+  var list = S.filtered.length ? S.filtered : S.estacoes;
+  var cols  = ['codigo','endereco','bairro','cidade','tipo','statusEstacao','lat','lng'];
+  var rows  = [cols.join(',')];
+  list.forEach(function(e){
+    rows.push(cols.map(function(c){ return '"'+(e[c]||'').toString().replace(/"/g,'""')+'"'; }).join(','));
+  });
+  var blob = new Blob([rows.join('\n')], { type:'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'estacoes_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('CSV exportado com ' + list.length + ' estações', 'success');
+}
+
+/* ---------------------------------------
+   MODAL
+--------------------------------------- */
+function openModal(title, bodyHtml, buttons) {
+  setText('modalTitle', title);
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFoot').innerHTML = (buttons||[]).map(function(b){
+    return '<button class="'+b.cls+'" onclick="'+b.action+'">'+b.label+'</button>';
+  }).join('');
+  document.getElementById('modal').classList.add('visible');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('visible');
+}
+
+/* ---------------------------------------
+   TOAST
+--------------------------------------- */
+var _toastTimer;
+function showToast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (type ? ' '+type : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 3000);
+}
+
+/* ---------------------------------------
+   UTILS
+--------------------------------------- */
+function setText(id, v) { var el = document.getElementById(id); if(el) el.textContent = v == null ? '--' : v; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function pad(n) { return n < 10 ? '0'+n : n; }
+
+/* ---------------------------------------
+   BOOT
+--------------------------------------- */
+window.addEventListener('DOMContentLoaded', function() {
+  if (restoreSession()) {
+    startApp();
+  } else {
+    initAuth();
+  }
+});
+</script>
+</body>
+</html>

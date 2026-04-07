@@ -1,0 +1,269 @@
+/*
+REGRAS DO PROJETO:
+- Não usar template literal
+- Não usar emojis em JS
+- Não usar HTML multilinha em string
+- Qualquer feature nova começa OFF
+- Uma mudança por deploy
+*/
+
+# 📍 App Estações — README Técnico
+
+## 1. Visão Geral
+
+O **App Estações** é um WebApp em **Google Apps Script + Google Maps** utilizado para visualização, auditoria e gestão de estações (Pública / Privada / Concorrente), com foco em uso operacional em campo.
+
+O projeto foi arquitetado com **baseline estável**, **features isoladas por etapas** e **controle rígido de renderização**, devido às limitações do sandbox do Apps Script.
+
+---
+
+## 2. Objetivos do Sistema
+
+* Visualizar estações georreferenciadas em mapa
+* Filtrar por cidade, tipo, status e subprefeitura (SP)
+* Identificar duplicidades
+* Visualizar raios operacionais
+* Executar auditoria cruzada com dados externos (**Jet Cross**)
+
+---
+
+## 3. Stack Técnica
+
+* **Frontend:** HTML + CSS + JavaScript puro
+* **Backend:** Google Apps Script (V8)
+* **Mapa:** Google Maps JavaScript API
+* **Dados:** Google Sheets
+
+⚠️ **Não utiliza frameworks** (React, Vue, etc.) por compatibilidade e estabilidade.
+
+---
+
+## 4. Arquitetura Geral
+
+### 4.1 Backend (Apps Script)
+
+Principais responsabilidades:
+
+* Leitura de dados das abas
+* Normalização
+* Cálculos geográficos
+* Retorno de dados via `google.script.run`
+
+Funções principais:
+
+* `getEstacoesWebApp()` — dados base do mapa
+* `getJetCrossMapa(cidade)` — dados do Jet Cross (somente leitura)
+* Funções de debug (`debugJetCross`, etc.)
+
+⚠️ Backend **não controla UI**.
+
+---
+
+### 4.2 Frontend (index.html)
+
+Responsável por:
+
+* Inicialização do mapa (`initMap`)
+* Renderização visual
+* Filtros e interações
+* Controle de modo (Normal x Jet Cross)
+
+Nenhuma lógica crítica de dados reside no frontend.
+
+---
+
+## 5. Regras do Sandbox (CRÍTICO)
+
+Estas regras **não podem ser quebradas**:
+
+❌ Não usar **template literals** (`` ` ``)
+❌ Não usar **emojis em JS**
+❌ Não usar **HTML multilinha em strings**
+❌ Não executar código paralelo antes do `initMap()`
+❌ Não misturar múltiplas features em um único deploy
+
+Qualquer violação pode quebrar o mapa silenciosamente.
+
+---
+
+## 6. Baseline do Mapa
+
+O baseline funcional garante:
+
+* Carregamento do Google Maps
+* Markers por tipo
+* Clusters
+* Filtro por cidade
+* Subprefeitura (SP)
+
+Se o mapa não carregar:
+➡️ rollback imediato para o baseline
+
+---
+
+## 7. Jet Cross — Visão Técnica
+
+### 7.1 Conceito
+
+**Jet Cross** é um **modo exclusivo de auditoria visual**, que cruza dados externos (JET) com estações internas.
+
+Não é uma camada visual comum.
+
+---
+
+### 7.2 Contrato de Dados
+
+Retorno do backend:
+
+```js
+{
+  lat: Number,
+  lng: Number,
+  statusComparacao: 'OK' | 'NOVO' | 'CANCELADO',
+  origem: 'JET',
+  codigo: String,
+  distancia: Number
+}
+```
+
+---
+
+### 7.3 Etapas de Implementação (Histórico)
+
+1. ETAPA 0 — Baseline
+2. ETAPA 1 — Dados (backend isolado)
+3. ETAPA 2 — Markers simples
+4. ETAPA 3 — Tooltip hover
+5. ETAPA 4 — Filtro por cidade
+6. ETAPA 5 — Legenda visual
+7. ETAPA 5.1 — Modo exclusivo
+8. ETAPA 6 — FitBounds opcional
+
+⚠️ Nunca pular etapas.
+
+---
+
+### 7.4 Modo Exclusivo
+
+Quando Jet Cross está ativo:
+
+* Estações normais são ocultadas
+* Render padrão é bloqueado
+* Zoom não reativa estações
+
+Implementação feita via controle explícito no `render()`.
+
+---
+
+## 8. Controle de Render (Ponto Crítico)
+
+Existe **apenas um ponto central de renderização**:
+
+```js
+function render() { ... }
+```
+
+Qualquer nova feature deve:
+
+* Ou bloquear o render
+* Ou se integrar explicitamente a ele
+
+Nunca renderizar em paralelo.
+
+---
+
+## 9. Flags e Estado
+
+Estado atual é controlado por:
+
+* Checkboxes
+* Flags globais
+* Zoom
+
+### Evolução recomendada:
+
+Criar `appState` centralizado:
+
+```js
+var appState = {
+  modo: 'NORMAL',
+  cidade: '',
+  zoom: 5
+};
+```
+
+---
+
+## 10. Debug e Testes
+
+### Backend
+
+* Usar funções de debug manuais
+* Nunca remover funções de teste
+
+### Frontend
+
+* Evitar dependência de console manual
+* Preferir execução controlada
+
+---
+
+## 11. Boas Práticas de Deploy
+
+* Uma mudança por deploy
+* Sempre criar nova versão
+* Testar reload múltiplas vezes
+* Validar console limpo
+
+---
+
+## 12. Riscos Conhecidos
+
+* Sandbox quebrar silenciosamente
+* Re-render automático via zoom
+* Crescimento sem controle de estado
+
+Mitigação:
+
+* Etapas
+* Documentação
+* Disciplina técnica
+
+---
+
+## 13. Próximas Evoluções Possíveis
+
+* Centralização de estado
+* Clusters exclusivos para Jet Cross
+* Filtros avançados (somente NOVO/CANCELADO)
+* Exportação de dados por cidade
+* Dashboard analítico
+
+---
+
+## 14. Filosofia do Projeto
+
+> **Estabilidade > velocidade**
+
+Qualquer feature nova deve:
+
+1. Nascer desligada
+2. Ser validada isoladamente
+3. Não comprometer o mapa
+
+---
+
+## 15. Responsabilidade Técnica
+
+Este projeto exige:
+
+* Disciplina
+* Cuidado com sandbox
+* Respeito ao baseline
+
+Alterações fora dessas regras **não são aceitáveis**.
+
+---
+
+📌 **Este README é parte do sistema.**
+Não atualizar o código sem atualizar este documento.

@@ -1,0 +1,4731 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>App Estações — Mapa Estratégico</title>
+
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f172a;
+      --panel2:#111827;
+      --card:rgba(255,255,255,.06);
+      --border:rgba(255,255,255,.12);
+      --border2:rgba(255,255,255,.16);
+      --fg:#ffffff;
+      --muted:#9ca3af;
+      --shadow: 0 10px 28px rgba(0,0,0,.35);
+      --shadow2: 0 8px 18px rgba(0,0,0,.25);
+      --accent:#60a5fa;
+      --good:#22c55e;
+      --bad:#ef4444;
+      --warn:#f59e0b;
+      --radius:16px;
+    }
+
+    *{ box-sizing:border-box; }
+    html, body{ height:100%; }
+    body{
+      margin:0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow:hidden;
+    }
+
+    /* ===============================
+       APP LAYOUT (DESKTOP PREMIUM)
+    =============================== */
+    #app{
+      display:flex;
+      height:100vh;
+      width:100vw;
+      overflow:hidden;
+    }
+
+    /* LEFT SIDEBAR */
+    #sidebar{
+      width: 360px;
+      min-width: 360px;
+      height:100%;
+      background: linear-gradient(180deg, rgba(17,24,39,.96), rgba(15,23,42,.96));
+      border-right: 1px solid rgba(255,255,255,.10);
+      box-shadow: var(--shadow);
+      display:flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 20;
+      transition: width .18s ease, min-width .18s ease, transform .18s ease;
+    }
+
+    #sidebar.collapsed{
+      width: 54px;
+      min-width: 54px;
+    }
+
+    #sidebarHeader{
+      padding: 14px 14px 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap:10px;
+    }
+
+    #brand{
+      display:flex;
+      flex-direction: column;
+      gap:4px;
+      min-width:0;
+    }
+    #brand .title{
+      font-weight: 900;
+      letter-spacing:.2px;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      font-size: 15px;
+      line-height: 1.05;
+    }
+    #brand .sub{
+      font-size: 12px;
+      color: rgba(255,255,255,.70);
+      font-weight: 800;
+      white-space: nowrap;
+      overflow:hidden;
+      text-overflow: ellipsis;
+    }
+
+    .iconBtn{
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.08);
+      color:#fff;
+      font-weight: 900;
+      border-radius: 12px;
+      padding: 8px 10px;
+      cursor:pointer;
+    }
+    .iconBtn:active{ transform: translateY(1px); }
+
+    #sidebarBody{
+      padding: 12px 12px 14px 12px;
+      overflow:auto;
+      height: calc(100vh - 62px);
+    }
+
+    /* When collapsed: hide content, keep only small rail */
+    #sidebar.collapsed #brand,
+    #sidebar.collapsed #sidebarBody{
+      opacity:0;
+      pointer-events:none;
+    }
+    #sidebar.collapsed #sidebarHeader{
+      justify-content:center;
+    }
+    #sidebar.collapsed #btnCollapse{
+      width: 38px;
+      height: 38px;
+      border-radius: 14px;
+      padding: 0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    /* MAIN (MAP) */
+    #main{
+      flex:1;
+      position: relative;
+      height:100%;
+      overflow:hidden;
+    }
+    #mapWrap{
+      position: absolute;
+      inset: 0;
+    }
+    #map{
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ===============================
+       PREMIUM SECTIONS + BUTTONS
+    =============================== */
+    .panelCard{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 24px rgba(0,0,0,.18);
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .panelTitle{
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing:.4px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.72);
+      margin-bottom: 10px;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap:10px;
+    }
+
+    .fieldLabel{
+      font-size: 12px;
+      font-weight: 900;
+      color: rgba(255,255,255,.86);
+      margin-bottom: 6px;
+    }
+
+    select, input[type="text"], input[type="number"]{
+      width:100%;
+      padding: 10px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.18);
+      color:#fff;
+      outline: none;
+      font-weight: 800;
+    }
+    input::placeholder{ color: rgba(255,255,255,.55); }
+
+    .grid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btnRow{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btnPill{
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      color:#fff;
+      font-weight: 900;
+      border-radius: 999px;
+      padding: 10px 12px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      user-select:none;
+    }
+    .btnPill.on{
+      background: rgba(96,165,250,.22);
+      border-color: rgba(96,165,250,.45);
+    }
+    .btnPill:active{ transform: translateY(1px); }
+
+    .segRow{
+      display:flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .seg{
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.08);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 13px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+    }
+    .seg input{ display:none; }
+    .seg .dot{
+      width:10px;
+      height:10px;
+      border-radius:50%;
+      background: rgba(255,255,255,.25);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+    }
+    .seg input:checked + .dot{ background: var(--accent); }
+    .seg.green input:checked + .dot{ background: var(--good); }
+    .seg.red input:checked + .dot{ background: var(--bad); }
+    .seg.gray input:checked + .dot{ background: rgba(255,255,255,.85); }
+
+    .mutedLine{
+      color: rgba(255,255,255,.70);
+      font-size: 12px;
+      font-weight: 800;
+      margin-top: 10px;
+    }
+
+    .dash-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.06); }
+    .dash-section-title { font-size: 12px; opacity: .75; letter-spacing: .08em; margin-bottom: 8px; }
+
+    .dash-banner{
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(59,130,246,.12);
+      border: 1px solid rgba(59,130,246,.25);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .dash-banner.warn{
+      background: rgba(245,158,11,.12);
+      border-color: rgba(245,158,11,.28);
+    }
+    .dash-banner.danger{
+      background: rgba(239,68,68,.12);
+      border-color: rgba(239,68,68,.28);
+    }
+
+    /* ===============================
+       MAP HUD (optional small)
+    =============================== */
+    #mapHud{
+      position:absolute;
+      top: 10px;
+      left: 10px;
+      display:flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      z-index: 5;
+      pointer-events:none;
+    }
+    .hudCard{
+      pointer-events:none;
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(229,231,235,.9);
+      border-radius: 12px;
+      padding: 8px 10px;
+      box-shadow: 0 8px 18px rgba(0,0,0,.18);
+      font-size: 12px;
+      line-height: 1.25;
+      min-width: 120px;
+      color:#111827;
+    }
+    .hudTitle{ font-weight:900; }
+    .hudRow{ opacity:.95; }
+
+    #legendaJetCross {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      z-index: 10;
+      color:#111827;
+    }
+    #legendaJetCross .item { display:flex; align-items:center; margin-bottom:4px; }
+    #legendaJetCross .item:last-child { margin-bottom:0; }
+    #legendaJetCross .dot {
+      width:10px; height:10px; border-radius:50%;
+      display:inline-block; margin-right:6px;
+    }
+    #legendaJetCross .dot.novo { background:#2563eb; }
+    #legendaJetCross .dot.cancelado { background:#dc2626; }
+
+    /* ===============================
+       MOBILE
+    =============================== */
+    body.mobile #app{
+      display:block;
+      overflow:auto;
+    }
+    body.mobile #sidebar{
+      width:100%;
+      min-width:100%;
+      height:auto;
+      position: sticky;
+      top:0;
+      z-index: 50;
+      border-right: 0;
+      border-bottom: 1px solid rgba(255,255,255,.12);
+    }
+    body.mobile #sidebarBody{
+      height:auto;
+      overflow: visible;
+    }
+    body.mobile #main{
+      height: calc(100vh - 200px);
+      min-height: 320px;
+    }
+    body.mobile #mapWrap{
+      position: relative;
+      height: calc(100vh - 180px);
+      min-height: 320px;
+    }
+
+    /* Bottom-sheet mode */
+    body.mobile #app{
+      display:block !important;
+      height: 100vh !important;
+      overflow:hidden !important;
+    }
+    body.mobile #main{
+      position: fixed !important;
+      inset: 0 !important;
+      height: 100vh !important;
+      z-index: 1 !important;
+    }
+    body.mobile #mapWrap{
+      position: absolute !important;
+      inset: 0 !important;
+      height: 100vh !important;
+    }
+
+    body.mobile #sidebar{
+      position: fixed !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+
+      width: 100% !important;
+      min-width: 100% !important;
+
+      height: var(--sheet-h, 60vh) !important;
+      max-height: 92vh !important;
+
+      border-right: 0 !important;
+      border-top: 1px solid rgba(255,255,255,.12) !important;
+      border-bottom: 0 !important;
+
+      border-radius: 18px 18px 0 0 !important;
+      overflow: hidden !important;
+
+      z-index: 999 !important;
+
+      transition: height .18s ease, transform .18s ease !important;
+      transform: translateY(var(--sheet-ty, 0px)) !important;
+
+      will-change: height, transform;
+    }
+
+    body.mobile #sidebarHeader{
+      position: relative;
+      padding: 10px 12px !important;
+    }
+
+    body.mobile #sheetHandle{
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.28);
+    }
+
+    body.mobile #sidebarBody{
+      height: calc(var(--sheet-h, 60vh) - 56px) !important;
+      overflow: auto !important;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 18px;
+    }
+
+    body.mobile #sidebar.is-collapsed #sidebarBody{
+      display:none !important;
+    }
+
+    body.mobile #btnCollapse{
+      width: 40px !important;
+      height: 40px !important;
+      border-radius: 14px !important;
+    }
+
+    body.mobile #mapHud{
+      top: 10px !important;
+      left: 10px !important;
+    }
+
+    /* InfoWindow premium */
+    .iwCard{
+      font-family: Arial, sans-serif;
+      min-width: 220px;
+      max-width: 320px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,.12);
+      box-shadow: 0 10px 24px rgba(0,0,0,.20);
+    }
+    .iwHead{
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 12px;
+      font-weight: 900;
+      font-size: 13px;
+    }
+    .iwBody{
+      background: #ffffff;
+      color: #111827;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+    .iwMeta{ color:#374151; font-weight:800; margin-top:6px; }
+
+    .gm-style .gm-style-iw-c{ padding: 0 !important; }
+    .gm-style .gm-style-iw-d{ overflow: hidden !important; }
+
+    /* Enterprise polish */
+    .panelCard{
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.10);
+      box-shadow: 0 16px 40px rgba(0,0,0,.28);
+    }
+    .panelTitle{
+      font-size: 11px;
+      letter-spacing: .14em;
+      opacity: .85;
+    }
+    select, input[type="text"], input[type="number"]{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .btnPill{
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.10);
+    }
+    .btnPill.on{
+      background: rgba(96,165,250,.18);
+      border-color: rgba(96,165,250,.38);
+    }
+
+    #sidebarBody{
+      overflow-y: auto;
+      padding-bottom: 10px;
+      height: calc(100vh - 62px);
+      scrollbar-gutter: stable;
+    }
+
+    .panelCard[data-scroll="soft"]{
+      max-height: 42vh;
+      overflow: auto;
+    }
+
+    .debugRow{
+      display:none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,.08);
+      font-size: 12px;
+      font-weight: 800;
+      opacity: .8;
+    }
+    body.debug .debugRow{ display:block; }
+
+    .debugToggle{
+      font-size: 12px;
+      font-weight: 900;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color:#fff;
+      border-radius: 999px;
+      padding: 8px 10px;
+      cursor:pointer;
+    }
+    .debugToggle.on{
+      background: rgba(96,165,250,.18);
+      border-color: rgba(96,165,250,.38);
+    }
+
+    .ctxRow{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .ctxBox{
+      background: rgba(0,0,0,.18);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 10px 12px;
+    }
+    .ctxBox .lab{
+      font-size: 11px;
+      font-weight: 900;
+      opacity: .7;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+    }
+    .ctxBox .val{
+      font-size: 14px;
+      font-weight: 900;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .kpiStrip{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .kpiTile{
+      background: linear-gradient(180deg, rgba(0,0,0,.20), rgba(0,0,0,.08));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 12px;
+      min-height: 70px;
+    }
+    .kpiTile .lab{
+      font-size: 11px;
+      font-weight: 900;
+      opacity: .75;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .kpiTile .val{
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: .2px;
+      line-height: 1;
+    }
+    .kpiTile .sub{
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      opacity: .7;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @media (max-width: 1180px){
+      .kpiStrip{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    body.mobile .kpiStrip{
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    body.mobile .debugRow{ display:none !important; }
+  
+    /* ---------- ADD MODE DOCK (Premium minimal) ---------- */
+    #addDock{
+      position:absolute;
+      top:14px;
+      right:14px;
+      width:360px;
+      max-width: calc(100vw - 28px);
+      background: rgba(17,24,39,.92);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      z-index: 99999;
+      color: var(--fg);
+      pointer-events: auto;
+    }
+    #addDock[hidden]{ display:none !important; }
+
+    .addDockHd{
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap:10px;
+      padding: 12px 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,.10);
+    }
+    .addDockTitle{ font-weight: 900; font-size: 14px; letter-spacing: .2px; }
+    .addDockBody{ padding: 12px; }
+    .addRow{ display:flex; gap:8px; align-items:center; margin:8px 0; }
+    .addRowCol{ display:flex; flex-direction: column; gap:6px; margin:8px 0; }
+    .addRowWrap{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+
+    #addDock input[type="text"],
+    #addDock input[type="password"],
+    #addDock input[type="number"],
+    #addDock select,
+    #addDock textarea{
+      width:100%;
+      padding:10px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--fg);
+      outline:none;
+    }
+    #addDock textarea{ min-height: 72px; resize: vertical; }
+
+    .btnPrimary, .btnGhost, .btnDanger{
+      border-radius: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      cursor:pointer;
+      font-weight: 800;
+      font-size: 13px;
+      user-select:none;
+      white-space: nowrap;
+    }
+    .btnPrimary{ background: rgba(96,165,250,.95); color:#0b1220; border-color: rgba(96,165,250,.6); }
+    .btnGhost{ background: rgba(255,255,255,.06); color: var(--fg); }
+    .btnDanger{ background: rgba(239,68,68,.92); color:#0b1220; border-color: rgba(239,68,68,.6); }
+
+    .pillLine{ display:flex; gap:6px; flex-wrap: wrap; margin-top:8px; }
+    .pill{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      font-size: 12px;
+      color: rgba(255,255,255,.92);
+      max-width: 100%;
+      overflow:hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .mutedSmall{ font-size: 12px; color: rgba(255,255,255,.70); }
+    .inlineError{ font-size: 12px; color: #fecaca; }
+    .inlineOk{ font-size: 12px; color: #bbf7d0; }
+    .sep{ height:1px; background: rgba(255,255,255,.10); margin:10px 0; }
+
+    @media (max-width: 720px){
+      #addDock{ left: 10px; right: 10px; width:auto; top:auto; bottom: 90px; }
+    }
+
+  /* ===================== PREMIUM UX PACK (lightweight) ===================== */
+:root{
+  --px-bg:#0b1220;
+  --px-panel:rgba(17,24,39,.86);
+  --px-card:rgba(255,255,255,.06);
+  --px-border:rgba(255,255,255,.12);
+  --px-border2:rgba(255,255,255,.16);
+  --px-fg:#ffffff;
+  --px-muted:rgba(255,255,255,.70);
+  --px-accent:#60a5fa;
+}
+
+html, body{
+  background: var(--px-bg);
+  color: var(--px-fg);
+}
+
+/* Sidebar / dashboard polish */
+.sidebar, #sidebar, .sidePanel, .premiumSidebar{
+  background: linear-gradient(180deg, rgba(15,23,42,.96), rgba(17,24,39,.90));
+  border-right: 1px solid var(--px-border);
+}
+
+.panel, .card, .box, .section, .hudPanel{
+  background: var(--px-card);
+  border: 1px solid var(--px-border);
+  border-radius: 16px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.28);
+}
+
+/* Consistent text */
+label, .muted, .hint, .sub, .mutedSmall{
+  color: var(--px-muted) !important;
+}
+.sectionTitle, .title, h2, h3{
+  letter-spacing: .2px;
+}
+
+/* Inputs premium (fallback even with custom select) */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+textarea{
+  background: rgba(255,255,255,.06) !important;
+  color: var(--px-fg) !important;
+  border: 1px solid var(--px-border2) !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+  outline: none !important;
+}
+input:focus, textarea:focus{
+  border-color: rgba(96,165,250,.75) !important;
+  box-shadow: 0 0 0 4px rgba(96,165,250,.16) !important;
+}
+
+/* Buttons: better hit area + premium states */
+button, .btnPrimary, .btnGhost, .btnDanger, .btn, .pillBtn{
+  border-radius: 14px !important;
+  min-height: 42px;
+}
+button:active, .btnPrimary:active, .btnGhost:active, .btnDanger:active{
+  transform: translateY(1px);
+}
+
+/* Scrollbar (desktop) */
+@media (hover:hover){
+  *::-webkit-scrollbar{ height: 10px; width: 10px; }
+  *::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.14); border-radius: 999px; }
+  *::-webkit-scrollbar-track{ background: rgba(255,255,255,.06); border-radius: 999px; }
+}
+
+/* Safe-area padding for mobile bottom */
+@supports (padding: max(0px)){
+  .sidebar, #sidebar{
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* ===== Premium Custom Select (no white native dropdown) ===== */
+.pxSelectWrap{ position:relative; width:100%; }
+.pxSelect{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.95);
+  cursor:pointer;
+  user-select:none;
+  min-height: 42px;
+}
+.pxSelect:active{ transform: translateY(1px); }
+.pxSelect .pxLabel{
+  font-size: 13px;
+  font-weight: 700;
+  opacity:.92;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pxSelect .pxChevron{
+  width: 10px; height: 10px;
+  border-right:2px solid rgba(255,255,255,.75);
+  border-bottom:2px solid rgba(255,255,255,.75);
+  transform: rotate(45deg);
+  opacity:.9;
+  flex:0 0 auto;
+}
+.pxMenu{
+  position:absolute;
+  left:0; right:0;
+  top: calc(100% + 8px);
+  background: rgba(17,24,39,.98);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0,0,0,.45);
+  z-index: 999999;
+  overflow:hidden;
+  display:none;
+}
+.pxMenu.open{ display:block; }
+.pxMenuList{
+  max-height: 260px;
+  overflow:auto;
+}
+.pxItem{
+  padding: 11px 12px;
+  font-size: 13px;
+  color: rgba(255,255,255,.92);
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.pxItem:first-child{ border-top:none; }
+.pxItem:hover{ background: rgba(96,165,250,.10); }
+.pxItem.active{
+  background: rgba(96,165,250,.16);
+  color: rgba(255,255,255,.98);
+}
+select.pxNative{
+  position:absolute !important;
+  left:-99999px !important;
+  top:auto !important;
+  width:1px !important;
+  height:1px !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+  z-index:-1 !important;
+}
+
+/* ===== Mobile Premium UX ===== */
+@media (max-width: 720px){
+  body{ font-size: 15px; }
+  label, .mutedSmall, .hint, .sub { font-size: 13px !important; }
+  .sectionTitle, .title { font-size: 14px !important; }
+
+  input, textarea, .pxSelect, button, .btnPrimary, .btnGhost, .btnDanger{
+    min-height: 50px !important;
+    font-size: 14px !important;
+  }
+
+  .pill, .chip, .togglePill{
+    padding: 10px 12px !important;
+    border-radius: 999px;
+    font-size: 13px !important;
+  }
+
+  /* Make any sidebar/minimize buttons easier to tap (common ids/classes) */
+  #btnMinimize, #btnCollapse, #btnCollapseSidebar, #btnSidebarToggle,
+  .btnMinimize, .btnCollapse, .sidebarToggle, .minBtn, .collapseBtn{
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 16px !important;
+    touch-action: manipulation;
+  }
+  #btnMinimize svg, #btnCollapse svg, #btnCollapseSidebar svg, #btnSidebarToggle svg,
+  .btnMinimize svg, .btnCollapse svg, .sidebarToggle svg, .minBtn svg, .collapseBtn svg{
+    width: 22px !important;
+    height: 22px !important;
+  }
+}
+/* =================== END PREMIUM UX PACK =================== */
+
+
+/* ===== City Select HARD OVERRIDE (prevents native white dropdown) ===== */
+.pxCityWrap{ position:relative; width:100%; }
+.pxCityNative{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+  z-index:-1 !important;
+}
+.pxCityBtn{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.95);
+  cursor:pointer;
+  user-select:none;
+  min-height: 44px;
+}
+.pxCityBtn .pxLabel{
+  font-size: 13px;
+  font-weight: 700;
+  opacity:.92;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pxCityBtn .pxChevron{
+  width: 10px; height: 10px;
+  border-right:2px solid rgba(255,255,255,.75);
+  border-bottom:2px solid rgba(255,255,255,.75);
+  transform: rotate(45deg);
+  opacity:.9;
+  flex:0 0 auto;
+}
+
+</style>
+</head>
+
+<body>
+  <div id="app">
+
+    <!-- LEFT PREMIUM SIDEBAR -->
+    <aside id="sidebar" class="desktop-only">
+      <div id="sidebarHeader">
+        <div id="sheetHandle"></div>
+        <div id="brand">
+          <div class="title">App Estações</div>
+          <div class="sub">Mapa Estratégico • Premium</div>
+        </div>
+        <button id="btnCollapse" class="iconBtn" type="button">⟨⟨</button>
+      </div>
+
+      <div id="sidebarBody">
+
+        <!-- CONTROLES -->
+        <div class="panelCard">
+          <div class="panelTitle">Controles</div>
+
+          <div class="fieldLabel">Cidade</div>
+          <select id="cidadeFilter">
+            <option value="">Todas as cidades</option>
+          </select>
+
+          <div style="height:10px"></div>
+
+          <div class="fieldLabel">Busca</div>
+          <input id="searchInput" type="text" placeholder="código, bairro, endereço..." />
+
+          <div class="btnRow">
+            <button class="btnPill" id="btnCentralizar" type="button">Centralizar</button>
+            <button class="btnPill" id="btnRecarregar" type="button">Recarregar</button>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="btnPill" id="btnMinhaLocal" type="button">📍 Minha localização</button>
+            <button class="btnPill" id="btnSeguirLocal" type="button">Seguir: <b id="lblSeguirLocal">OFF</b></button>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="btnPill" id="btnToggleAddMode" type="button">➕ Add Mode: <b id="lblAddMode">OFF</b></button>
+            <button class="btnPill" id="btnAddHelp" type="button" title="Ajuda rápida" style="opacity:.9;">?</button>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="btnPill" id="btnBikeLayer" type="button">Ciclovias: <b id="lblBikeLayer">OFF</b></button>
+            <button class="btnPill" id="btnTraffic" type="button" style="display:none;"></button>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="btnPill" id="btnPoligonos" type="button">Polígonos: <b id="lblPoli">OFF</b></button>
+            <button class="btnPill" id="btnRaio" type="button">Raios: <b id="lblRaio">OFF</b></button>
+          </div>
+
+          <div class="btnRow" style="margin-top:10px;">
+            <button class="btnPill on" id="btnCluster" type="button">Cluster: <b id="lblCluster">ON</b></button>
+            <button class="btnPill" id="btnRaioCentro" type="button">Raio Estações: <b id="lblRaioEst">OFF</b></button>
+          </div>
+
+          <div class="mutedLine">
+            Base carregada: <b id="lblBaseCount">0</b> estações
+          </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="panelCard">
+          <div class="panelTitle">Filtros</div>
+
+          <div class="fieldLabel">Tipo</div>
+          <div class="segRow">
+            <label class="seg"><input type="checkbox" id="chkPublica" checked><span class="dot"></span> Pública</label>
+            <label class="seg green"><input type="checkbox" id="chkPrivada" checked><span class="dot"></span> Privada</label>
+            <label class="seg red"><input type="checkbox" id="chkConcorrente"><span class="dot"></span> Concorrente</label>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="fieldLabel">Status (Públicas)</div>
+          <div class="segRow">
+            <label class="seg"><input type="checkbox" id="chkAtivo" checked><span class="dot"></span> Ativo</label>
+            <label class="seg"><input type="checkbox" id="chkSolicitado" checked><span class="dot"></span> Solicitado</label>
+            <label class="seg gray"><input type="checkbox" id="chkCancelado" checked><span class="dot"></span> Cancelado</label>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="fieldLabel">Modalidade</div>
+          <div class="segRow">
+            <label class="seg"><input type="checkbox" id="chkPatinete" checked><span class="dot"></span> 🛴 Patinete</label>
+            <label class="seg"><input type="checkbox" id="chkBike" checked><span class="dot"></span> 🚲 Bike</label>
+            <label class="seg"><input type="checkbox" id="chkHibrida" checked><span class="dot"></span> ♦ Híbrida</label>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="grid2">
+            <label class="seg" style="justify-content:flex-start;">
+              <input type="checkbox" id="chkRaio"><span class="dot"></span> Raio
+            </label>
+
+            <div>
+              <div class="fieldLabel" style="margin:0 0 6px 0;">Raio (m)</div>
+              <input type="number" id="raioInput" value="200">
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="segRow">
+            <label class="seg"><input type="checkbox" id="chkDuplicidades"><span class="dot"></span> 🔁 Duplicidades</label>
+            <label class="seg"><input type="checkbox" id="chkJetCross"><span class="dot"></span> Jet Cross</label>
+          </div>
+
+          <select id="subprefFilter" multiple size="1" style="display:none;"></select>
+
+          <div id="polyControls" style="display:none;">
+            <label style="margin:0;"><input type="checkbox" id="chkPoligonos"> Polígonos</label>
+
+            <div id="chipFases" style="display:none;">
+              <label style="margin:0;"><input type="checkbox" class="chkFase" data-fase="Fase 1" checked> F1</label>
+              <label style="margin:0;"><input type="checkbox" class="chkFase" data-fase="Fase 2" checked> F2</label>
+              <label style="margin:0;"><input type="checkbox" class="chkFase" data-fase="Fase 3" checked> F3</label>
+            </div>
+
+            <div id="chipGrupo" style="display:none;">
+              <select id="grupoPoligonoFilter" multiple size="1"></select>
+            </div>
+
+            <div id="chipSomenteAtivos" style="display:none;">
+              <label style="margin:0;"><input type="checkbox" id="chkPoligonoSomenteAtivos" checked> somente ativos</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="panelCard" id="filtersCard" data-scroll="soft">
+          <div class="panelTitle">
+            <span>Dashboard</span>
+            <button id="btnDebugToggle" class="debugToggle" type="button">Debug</button>
+          </div>
+
+          <div class="ctxRow">
+            <div class="ctxBox">
+              <div class="lab">Modo</div>
+              <div class="val" id="dashModo">—</div>
+            </div>
+            <div class="ctxBox">
+              <div class="lab">Camada</div>
+              <div class="val" id="dashCamada">—</div>
+            </div>
+            <div class="ctxBox">
+              <div class="lab">Cidade</div>
+              <div class="val" id="dashCidade">—</div>
+            </div>
+            <div class="ctxBox">
+              <div class="lab">Zoom</div>
+              <div class="val" id="dashZoom">—</div>
+            </div>
+          </div>
+
+          <div class="kpiStrip">
+            <div class="kpiTile">
+              <div class="lab">Estações (filtro)</div>
+              <div class="val" id="dashFiltroTotal">0</div>
+              <div class="sub">Base: <span id="dashBaseTotal">0</span></div>
+            </div>
+
+            <div class="kpiTile">
+              <div class="lab">Públicas</div>
+              <div class="val" id="dashFiltroPub">0</div>
+              <div class="sub" id="dashPubSub">—</div>
+            </div>
+
+            <div class="kpiTile">
+              <div class="lab">Privadas</div>
+              <div class="val" id="dashFiltroPriv">0</div>
+              <div class="sub" id="dashPrivSub">—</div>
+            </div>
+
+            <div class="kpiTile">
+              <div class="lab">Concorrentes</div>
+              <div class="val" id="dashFiltroConc">0</div>
+              <div class="sub" id="dashConcSub">—</div>
+            </div>
+          </div>
+
+          <div id="dashBanner" class="dash-banner" style="display:none;"></div>
+
+          <div class="debugRow">
+            <div><span style="opacity:.75;">Render:</span> <span id="dbgRenderMs">—</span></div>
+            <div style="margin-top:6px;"><span style="opacity:.75;">Key:</span> <span id="dbgRenderKey">—</span></div>
+          </div>
+
+          <div id="dashboard" style="display:none;">
+            <span id="dashTotal">Total: 0</span>
+            <span id="dashPublica">Pública: 0</span>
+            <span id="dashPrivada">Privada: 0</span>
+            <span id="dashConcorrente">Concorrente: 0</span>
+            <span id="dashPatinete">🛴 0</span>
+            <span id="dashBike">🚲 0</span>
+            <span id="dashHibrida">♦ 0</span>
+            <span id="dashRender">Render: 0</span>
+          </div>
+
+          <div id="dashboardSP" style="display:none;"></div>
+          <div id="dashboardDup" style="display:none;"></div>
+
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN MAP -->
+    <main id="main">
+      <div id="mapWrap">
+        <div id="map"></div>
+
+        <!-- ADD DOCK (Modo Avançado) -->
+        <div id="addDock" hidden>
+          <div class="addDockHd">
+            <div>
+              <div class="addDockTitle">Modo Avançado — Adicionar Estação</div>
+              <div class="mutedSmall">Places / coordenadas / pin arrastável</div>
+            </div>
+            <button id="btnLockAdd" class="btnDanger" type="button">Bloquear</button>
+          </div>
+
+          <div class="addDockBody">
+            <!-- GATE -->
+            <div id="addGate">
+              <div class="addRowCol">
+                <label class="mutedSmall">Senha JET</label>
+                <input id="addPass" type="password" placeholder="Digite a senha" autocomplete="off" />
+              </div>
+              <div class="addRow">
+                <button id="btnUnlockAdd" class="btnPrimary" type="button">Liberar</button>
+                <div id="addGateErr" class="inlineError" style="display:none;"></div>
+              </div>
+              <div class="sep"></div>
+            </div>
+
+            <!-- FORM -->
+            <div id="addForm" style="display:none;">
+              <div class="addRowCol">
+                <label class="mutedSmall">Buscar endereço (Places)</label>
+                <input id="addSearch" type="text" placeholder="Digite rua, número, cidade…" />
+              </div>
+
+              <div class="addRowWrap">
+                <div style="flex:1; min-width: 120px;">
+                  <label class="mutedSmall">Lat</label>
+                  <input id="addLat" type="number" step="0.0000001" placeholder="-23.55" />
+                </div>
+                <div style="flex:1; min-width: 120px;">
+                  <label class="mutedSmall">Lng</label>
+                  <input id="addLng" type="number" step="0.0000001" placeholder="-46.63" />
+                </div>
+                <button id="btnGoCoords" class="btnGhost" type="button">Ir</button>
+                <button id="btnAddMyLoc" class="btnGhost" type="button">📍</button>
+                <button id="btnClearPin" class="btnGhost" type="button">Limpar</button>
+              </div>
+
+              <div class="pillLine">
+                <span id="pillAddr" class="pill">Endereço: —</span>
+                <span id="pillCity" class="pill">Cidade: —</span>
+                <span id="pillBairro" class="pill">Bairro: —</span>
+              </div>
+
+              <div class="sep"></div>
+
+              <div class="addRowWrap">
+                <div style="flex:1; min-width: 140px;">
+                  <label class="mutedSmall">Tipo</label>
+                  <select id="addTipo">
+                    <option value="PUBLICA">PÚBLICA</option>
+                    <option value="PRIVADA">PRIVADA</option>
+                    <option value="CONCORRENTE">CONCORRENTE</option>
+                  </select>
+                </div>
+
+                <div id="wrapAddStatus" style="flex:1; min-width: 160px;">
+                  <label class="mutedSmall">Status (pública)</label>
+                  <select id="addStatus">
+                    <option value="">Selecione</option>
+                    <option value="ATIVO">ATIVO</option>
+                    <option value="SOLICITADO">SOLICITADO</option>
+                    <option value="CANCELADO">CANCELADO</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="wrapAddConc" class="addRowCol" style="display:none;">
+                <label class="mutedSmall">Nome do concorrente</label>
+                <input id="addNomeConcorrente" type="text" placeholder="Ex: JET, Lime, etc." />
+              </div>
+
+              <div class="addRowCol">
+                <label class="mutedSmall">Modalidade</label>
+                <select id="addModalidade">
+                  <option value="PATINETE">PATINETE</option>
+                  <option value="BIKE">BIKE</option>
+                  <option value="HIBRIDA">HIBRIDA</option>
+                </select>
+              </div>
+
+              <div class="addRowCol">
+                <label class="mutedSmall">Observações</label>
+                <textarea id="addObs" placeholder="Detalhes, autorização, referência… (máx 500)"></textarea>
+              </div>
+
+              <div class="addRowCol">
+                <label class="mutedSmall">Foto (opcional)</label>
+                <input id="addFoto" type="file" accept="image/*" />
+                <div class="mutedSmall">Foto é comprimida antes de enviar.</div>
+              </div>
+
+              <div class="addRowWrap">
+                <button id="btnSaveEstacao" class="btnPrimary" type="button">Salvar estação</button>
+                <div id="addOk" class="inlineOk" style="display:none;"></div>
+                <div id="addErr" class="inlineError" style="display:none;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- HUD -->
+        <div id="mapHud">
+          <div class="hudCard" id="hudMain">
+            <div class="hudTitle">Resumo</div>
+            <div class="hudRow" id="hudTotal">Total: 0</div>
+            <div class="hudRow" id="hudRender">Render: 0</div>
+          </div>
+          <div class="hudCard" id="hudBreakdown">
+            <div class="hudTitle">Tipos</div>
+            <div class="hudRow" id="hudPub">Pública: 0</div>
+            <div class="hudRow" id="hudPri">Privada: 0</div>
+            <div class="hudRow" id="hudCon">Concorrente: 0</div>
+          </div>
+          <div class="hudCard" id="hudRaio" style="display:none;">
+            <div class="hudTitle">Raio</div>
+            <div class="hudRow" id="hudRaioVal">200m</div>
+          </div>
+        </div>
+
+        <div id="legendaJetCross" style="display:none;">
+          <div class="item"><span class="dot novo"></span> Novo</div>
+          <div class="item"><span class="dot cancelado"></span> Cancelado</div>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ✅ Clusterer antes do app -->
+  <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
+
+  <script>
+  /* ===============================
+     MOBILE DETECT
+  ================================ */
+  const IS_MOBILE =
+    window.matchMedia("(max-width: 768px)").matches ||
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  const MOBILE_CFG = {
+    disableDup: true,
+    disableJetCross: true,
+    liteMarkers: true,
+    infoWindowOnClickOnly: true,
+    cityLazyLoad: true,
+    liteMaxMarkers: 1500
+  };
+
+  if (IS_MOBILE) document.body.classList.add('mobile');
+
+  /* ===============================
+     VARS / DOM
+  ================================ */
+  let map, infoWindow;
+
+  let estacoes = [];                 // RAW
+  let estacoesPorCidade = {};        // cidade -> array estacoes
+  let markersCidade = [];            // modo cidade
+
+  let clusterPublica = null, clusterPrivada = null, clusterConcorrente = null;
+
+  let viewportEstacoes = [];
+  let viewportCircle = null;
+
+  let entrouPorCidade = false;
+  let jetCrossFitAplicado = false;
+
+  let bikeLayer = null;
+  let bikeLayerOn = false;
+    let _cicloPolylines  = []; 
+    let _cicloCarregadas = false; 
+    let _cicloCarregando = false; 
+
+
+  const ZOOM_LIMITE_CIDADE = 11;
+  const RAIO_ESTACAO_MIN = 30;
+  const RAIO_ESTACAO_MAX = 200;
+
+  const RAIO_ANALISE_MIN = 30;
+  const RAIO_ANALISE_MAX = 2000;
+
+  const GRID_PREFILTER_MIN = 900;
+  const ALLOW_PER_STATION_CIRCLES = !IS_MOBILE;
+
+  // INTERACTION LOCK
+  let isInteracting = false;
+
+  let _idleRenderTO = null;
+
+  function safeRenderRequest_(force=false){
+    if (isInteracting) return;
+    renderDebounced_(!!force);
+  }
+
+  // ===============================
+  // GEOLOCATION
+  // ===============================
+  let geoWatchId = null;
+  let geoMarker = null;
+  let geoCircle = null;
+  let geoFollow = false;
+
+  function ensureGeoOverlays_(){
+    if (!map || !google?.maps) return;
+    if (!geoMarker) {
+      geoMarker = new google.maps.Marker({
+        map: map,
+        zIndex: 999999,
+        clickable: false,
+        ...(google.maps.SymbolPath && google.maps.SymbolPath.CIRCLE ? {
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 7,
+            fillColor: '#111827',
+            fillOpacity: 0.95,
+            strokeColor: '#ffffff',
+            strokeWeight: 2
+          }
+        } : {})
+      });
+    }
+    if (!geoCircle) {
+      geoCircle = new google.maps.Circle({
+        map: map,
+        zIndex: 999998,
+        clickable: false,
+        fillColor: '#2563eb',
+        fillOpacity: 0.10,
+        strokeColor: '#1e40af',
+        strokeOpacity: 0.55,
+        strokeWeight: 1
+      });
+    }
+  }
+
+  function startGeoWatch_(){
+    if (!navigator.geolocation) { alert('Geolocalização não suportada.'); return; }
+    if (geoWatchId != null) return;
+
+    geoWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!map) return;
+        ensureGeoOverlays_();
+
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const acc = Math.max(10, Number(pos.coords.accuracy || 50));
+
+        const ll = { lat, lng };
+        geoMarker.setPosition(ll);
+        geoCircle.setCenter(ll);
+        geoCircle.setRadius(acc);
+
+        if (geoFollow) {
+          map.panTo(ll);
+          const z = map.getZoom() || 0;
+          if (z < 15) map.setZoom(15);
+        }
+      },
+      (err) => {
+        console.warn('Geoloc erro:', err);
+        alert('Não foi possível obter sua localização.');
+        stopGeoWatch_();
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+  }
+
+  function stopGeoWatch_(){
+    if (geoWatchId != null) {
+      navigator.geolocation.clearWatch(geoWatchId);
+      geoWatchId = null;
+    }
+  }
+
+  function centerToMyLocationOnce_(){
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        ensureGeoOverlays_();
+        geoMarker.setPosition(ll);
+        geoCircle.setCenter(ll);
+        geoCircle.setRadius(Math.max(10, Number(pos.coords.accuracy || 50)));
+
+        map.panTo(ll);
+        map.setZoom(Math.max(map.getZoom() || 0, 16));
+      },
+      (err) => { console.warn('Geo erro:', err); alert('Não foi possível obter sua localização.'); },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  /* ===============================
+      MAP FSM (STATE MACHINE)
+  ================================ */
+  const LAYER = { NORMAL:'NORMAL', JETCROSS:'JETCROSS', DUP:'DUPLICIDADES' };
+  let MAP_STATE = null;
+
+  function computeDerived_(s){
+    const city = (s.city || '').trim();
+    const zoom = Number(s.zoom || 0);
+
+    s.mode = (!city && zoom <= ZOOM_LIMITE_CIDADE) ? 'MACRO' : 'MICRO';
+    s.canPolygons = !!city && zoom >= 12 && s.layer === LAYER.NORMAL;
+
+    if (s.layer !== LAYER.NORMAL) {
+      s.polygons = false;
+      s.radius = false;
+      s.stationRadius = false;
+    }
+
+    if (IS_MOBILE) s.stationRadius = false;
+    if (s.polygons && !s.canPolygons) s.polygons = false;
+    if (s.radius && s.layer !== LAYER.NORMAL) s.radius = false;
+
+    return s;
+  }
+
+  function initFSM_(){
+    MAP_STATE = computeDerived_({
+      layer: LAYER.NORMAL,
+      polygons: !!elChkPoligonos?.checked,
+      radius: !!elChkRaio?.checked,
+      cluster: (lblCluster?.textContent === 'ON'),
+      city: (elCidade?.value || ''),
+      zoom: (map?.getZoom?.() || 0),
+      canPolygons: false,
+      mode: 'MACRO',
+      forceRender: true,
+      stationRadius: false,
+    });
+
+    applyState_(MAP_STATE);
+  }
+
+  function enforceMobileLayers_(){
+    if (!IS_MOBILE) return;
+    if (!MAP_STATE) return;
+
+    // Force NORMAL layer and disable heavy overlays on mobile
+    MAP_STATE.layer = LAYER.NORMAL;
+    MAP_STATE.polygons = false;
+    MAP_STATE.radius = false;
+    MAP_STATE.stationRadius = false;
+
+    if (elChkJetCross) { elChkJetCross.checked = false; elChkJetCross.disabled = true; }
+    if (elChkDuplicidades) { elChkDuplicidades.checked = false; elChkDuplicidades.disabled = true; }
+
+    // Hide heavy controls if present
+    ['rowJetCross','rowDuplicidades','btnJetCross','btnDuplicidades'].forEach(id=>{
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
+
+  function dispatch_(type, payload={}){
+    if (!MAP_STATE) return;
+
+    const prevStr = JSON.stringify(MAP_STATE);
+    let s = { ...MAP_STATE, forceRender:false };
+
+    switch(type){
+      case 'MAP_IDLE':
+        s.zoom = payload.zoom ?? (map?.getZoom?.() || s.zoom || 0);
+        s.city = (elCidade?.value || s.city || '');
+        break;
+
+      case 'CITY_CHANGED':
+        s.city = payload.city ?? (elCidade?.value || '');
+        s.forceRender = true;
+        break;
+
+      case 'TOGGLE_LAYER':
+        if (IS_MOBILE && (payload.layer || LAYER.NORMAL) !== LAYER.NORMAL) {
+          // Mobile hard-block heavy layers
+          s.layer = LAYER.NORMAL;
+        } else {
+          s.layer = payload.layer || LAYER.NORMAL;
+        }
+        s.forceRender = true;
+        break;
+
+      case 'TOGGLE_POLYGONS':
+        s.polygons = !s.polygons;
+        s.forceRender = true;
+        break;
+
+      case 'TOGGLE_RADIUS':
+        s.radius = !s.radius;
+        s.forceRender = true;
+        break;
+
+      case 'TOGGLE_STATION_RADIUS':
+        s.stationRadius = !s.stationRadius;
+        s.forceRender = true;
+        break;
+
+      case 'TOGGLE_CLUSTER':
+        s.cluster = !s.cluster;
+        s.forceRender = true;
+        break;
+
+      case 'FILTER_CHANGED':
+        break;
+    }
+
+    MAP_STATE = computeDerived_(s);
+    const nextStr = JSON.stringify(MAP_STATE);
+    if (nextStr === prevStr && !MAP_STATE.forceRender) return;
+
+    applyState_(MAP_STATE);
+  }
+
+  function applyState_(s){
+    if (elChkJetCross) elChkJetCross.checked = (s.layer === LAYER.JETCROSS);
+    if (elChkDuplicidades) elChkDuplicidades.checked = (s.layer === LAYER.DUP);
+    if (elChkPoligonos) elChkPoligonos.checked = !!s.polygons;
+    if (elChkRaio) elChkRaio.checked = !!s.radius;
+
+    try{
+      if (lblCluster) lblCluster.textContent = s.cluster ? 'ON' : 'OFF';
+      btnCluster?.classList.toggle('on', !!s.cluster);
+
+      btnPoligonos?.classList.toggle('on', !!s.polygons && !!s.canPolygons);
+      btnPoligonos?.setAttribute('title', s.canPolygons ? '' : 'Polígonos: selecione uma cidade e use zoom ≥ 12');
+
+      const lblRaioEst = document.getElementById('lblRaioEst');
+      if (lblRaioEst) lblRaioEst.textContent = s.stationRadius ? 'ON' : 'OFF';
+      const btnRaioCentro = document.getElementById('btnRaioCentro');
+      btnRaioCentro?.classList.toggle('on', !!s.stationRadius);
+
+      if (elLegendaJetCross) elLegendaJetCross.style.display = (s.layer === LAYER.JETCROSS) ? 'block' : 'none';
+    }catch(e){}
+
+    if (!s.radius) limparViewportCircle();
+
+    renderDebounced_(!!s.forceRender);
+
+    try { updateDashboardFromState_(MAP_STATE, window.__LAST_METRICS__ || {}); } catch(e){}
+  }
+
+  // DOM refs
+  let elCidade, elSubpref;
+  let elChkPublica, elChkPrivada, elChkConcorrente;
+  let elDashPatinete, elDashBike, elDashHibrida;
+  let elChkAtivo, elChkSolicitado, elChkCancelado;
+  let elChkRaio, elRaioInput;
+  let elChkDuplicidades, elChkJetCross;
+  let elDashTotal, elDashPublica, elDashPrivada, elDashConcorrente, elDashRender;
+  let elDashboardSP, elDashboardDup;
+  let elLegendaJetCross;
+  let elChkPoligonos, elGrupoPoly, elChipGrupo, elChipFases, elChipSomenteAtivos, elChkPolySomenteAtivos;
+  let elChkPatinete, elChkBike, elChkHibrida;
+
+  // HUD
+  let hudTotal, hudRender, hudPub, hudPri, hudCon, hudRaio, hudRaioVal;
+
+  // Premium UI
+  let sidebarEl, btnCollapse;
+  let btnCentralizar, btnRecarregar;
+  let btnPoligonos, btnRaio, btnCluster;
+  let lblPoli, lblRaio, lblCluster;
+  let lblBaseCount;
+  let elSearchInput = null;
+  let SEARCH_Q = '';
+  let searchTimer_ = null;
+
+  /* ===============================
+     RENDER DEBOUNCE
+  ================================ */
+  let _renderTO = null;
+  let _renderRAF = null;
+  let _renderForce = false;
+
+  function renderDebounced_(force){
+    _renderForce = _renderForce || !!force;
+
+    if (_renderTO) clearTimeout(_renderTO);
+    if (_renderRAF) cancelAnimationFrame(_renderRAF);
+
+    _renderTO = setTimeout(() => {
+      _renderRAF = requestAnimationFrame(() => {
+        const f = _renderForce;
+        _renderForce = false;
+        render(f);
+      });
+    }, 60);
+  }
+
+  /* ===============================
+     RENDER KEY CACHE
+  ================================ */
+  let lastRenderKey_ = '';
+  let lastRenderAt_ = 0;
+
+  function renderKey_() {
+    if (!map) return '';
+
+    const z = map.getZoom() || 0;
+    const c = (elCidade?.value || '');
+
+    const b = map.getBounds();
+    const sw = b ? b.getSouthWest() : null;
+    const ne = b ? b.getNorthEast() : null;
+
+    const swLat = sw ? sw.lat().toFixed(4) : '';
+    const swLng = sw ? sw.lng().toFixed(4) : '';
+    const neLat = ne ? ne.lat().toFixed(4) : '';
+    const neLng = ne ? ne.lng().toFixed(4) : '';
+
+    const f = [
+      !!elChkPublica?.checked,
+      !!elChkPrivada?.checked,
+      !!elChkConcorrente?.checked,
+
+      !!elChkPatinete?.checked,
+      !!elChkBike?.checked,
+      !!elChkHibrida?.checked,
+
+      !!elChkRaio?.checked,
+      Number(elRaioInput?.value || 200),
+
+      !!elChkAtivo?.checked,
+      !!elChkSolicitado?.checked,
+      !!elChkCancelado?.checked,
+
+      (elSubpref && elSubpref.selectedOptions)
+        ? [...elSubpref.selectedOptions].map(o => o.value).sort().join(',')
+        : '',
+
+      !!elChkDuplicidades?.checked,
+      !!elChkJetCross?.checked,
+
+      !!elChkPoligonos?.checked,
+      !!elChkPolySomenteAtivos?.checked,
+
+      (typeof fasesSelecionadas_ === 'function')
+        ? [...fasesSelecionadas_()].sort().join(',')
+        : '',
+      (typeof gruposSelecionados_ === 'function')
+        ? [...gruposSelecionados_()].sort().join(',')
+        : '',
+
+      (SEARCH_Q || '')
+    ].join('|');
+
+    return [z, c, swLat, swLng, neLat, neLng, f].join('||');
+  }
+
+  // ===============================
+  // VISIBLE CACHE
+  // ===============================
+  let _VISIBLE_CACHE_KEY = '';
+  let _VISIBLE_CACHE_VAL = null;
+
+  function visibleCacheKey_(bounds){
+    const b = bounds || map.getBounds();
+    if (!b) return '';
+
+    const sw = b.getSouthWest(), ne = b.getNorthEast();
+    const z = map.getZoom() || 0;
+    const c = elCidade?.value || '';
+    const subp = (elSubpref && elSubpref.selectedOptions)
+      ? [...elSubpref.selectedOptions].map(o => o.value).sort().join(',')
+      : '';
+
+    return [
+      z, c,
+      sw.lat().toFixed(4), sw.lng().toFixed(4),
+      ne.lat().toFixed(4), ne.lng().toFixed(4),
+      SEARCH_Q || '',
+      subp,
+      !!elChkPublica?.checked, !!elChkPrivada?.checked, !!elChkConcorrente?.checked,
+      !!elChkPatinete?.checked, !!elChkBike?.checked, !!elChkHibrida?.checked,
+      !!elChkAtivo?.checked, !!elChkSolicitado?.checked, !!elChkCancelado?.checked
+    ].join('|');
+  }
+
+  function getVisibleFiltered_(bounds){
+    // ✅ guard hard: sem DOM pronto, não filtra
+    if (!elCidade || !elChkPublica || !elChkPrivada || !elChkConcorrente || !elChkPatinete || !elChkBike || !elChkHibrida) {
+      return [];
+    }
+
+    const key = visibleCacheKey_(bounds);
+    if (key && key === _VISIBLE_CACHE_KEY && Array.isArray(_VISIBLE_CACHE_VAL)) {
+      return _VISIBLE_CACHE_VAL;
+    }
+    _VISIBLE_CACHE_KEY = key;
+
+    const cidade = elCidade?.value || '';
+    const isSP = cidade === 'São Paulo';
+    const subprefs = (isSP && elSubpref?.selectedOptions)
+      ? [...elSubpref.selectedOptions].map(o => o.value)
+      : [];
+
+    const baseCidade = cidade ? (estacoesPorCidade[cidade] || []) : estacoes;
+
+    // Prefiltro espacial (grid)
+    let candidates = baseCidade;
+    if (bounds && baseCidade.length > GRID_PREFILTER_MIN) {
+      const cidadeKey = cidade || null;
+      const idxs = queryGridIdxsByBounds_(cidadeKey, bounds, map.getZoom());
+      if (idxs && idxs.length) candidates = idxs.map(i => baseCidade[i]).filter(Boolean);
+    }
+
+    _VISIBLE_CACHE_VAL = candidates.filter(e => {
+      if (cidade && e.cidade !== cidade) return false;
+      if (!matchModalidade_(e)) return false;
+      if (!matchBuscaFast_(e)) return false;
+
+      if (!elChkPublica.checked && e.tipo === 'PUBLICA') return false;
+      if (!elChkPrivada.checked && e.tipo === 'PRIVADA') return false;
+      if (!elChkConcorrente.checked && e.tipo === 'CONCORRENTE') return false;
+
+      if (isSP && subprefs.length && !subprefs.includes(e.subprefeitura)) return false;
+
+      if (e.tipo === 'PUBLICA') {
+        if (e.statusEstacao === 'ATIVO' && !elChkAtivo?.checked) return false;
+        if (e.statusEstacao === 'SOLICITADO' && !elChkSolicitado?.checked) return false;
+        if (e.statusEstacao === 'CANCELADO' && !elChkCancelado?.checked) return false;
+      }
+      return true;
+    });
+
+    return _VISIBLE_CACHE_VAL;
+  }
+
+  /* ===============================
+     CLUSTER CFG
+  ================================ */
+  const CLUSTER_CFG = { radius: 45, minClusterSize: 8 };
+
+  /* ===============================
+     PERFORMANCE CORE (Spatial index)
+  ================================ */
+  function cellSizeForZoom_(zoom) {
+    if (zoom <= 6)  return 0.50;
+    if (zoom <= 8)  return 0.20;
+    if (zoom <= 10) return 0.10;
+    if (zoom <= 12) return 0.05;
+    if (zoom <= 14) return 0.02;
+    if (zoom <= 16) return 0.01;
+    return 0.005;
+  }
+  function gridKey_(lat, lng, cellSize) {
+    const cx = Math.floor((Number(lng) + 180) / cellSize);
+    const cy = Math.floor((Number(lat) + 90) / cellSize);
+    return cx + '_' + cy;
+  }
+
+  const perf = {
+    gridByCity: new Map(),
+    cacheByCity: {},
+    aggByCity: new Map()
+  };
+
+  function ensureGridCity_(cidadeKey) {
+    const key = cidadeKey || "__ALL__";
+    let obj = perf.gridByCity.get(key);
+    if (!obj) {
+      obj = { builtSizes: new Map(), builtAggSizes: new Map(), lastSize: null };
+      perf.gridByCity.set(key, obj);
+    }
+    return obj;
+  }
+
+  function baseListByCityKey_(cidadeKey) {
+    if (!cidadeKey) return estacoes;
+    return (estacoesPorCidade[cidadeKey] || []);
+  }
+
+  function buildGridForCitySize_(cidadeKey, cellSize) {
+    const cityObj = ensureGridCity_(cidadeKey);
+    if (cityObj.builtSizes.has(cellSize) && cityObj.builtAggSizes.has(cellSize)) return;
+
+    const lista = baseListByCityKey_(cidadeKey);
+    const cells = new Map();
+    const agg = new Map();
+
+    for (let i = 0; i < lista.length; i++) {
+      const e = lista[i];
+      if (e?.lat == null || e?.lng == null) continue;
+
+      const lat = Number(e.lat), lng = Number(e.lng);
+      if (Number.isNaN(lat) || Number.isNaN(lng)) continue;
+
+      const key = gridKey_(lat, lng, cellSize);
+
+      let bucket = cells.get(key);
+      if (!bucket) { bucket = []; cells.set(key, bucket); }
+      bucket.push(i);
+
+      let a = agg.get(key);
+      if (!a) {
+        a = { pub: 0, pri: 0, con: 0, pubAtivo: 0, pubSolic: 0, pubCanc: 0 };
+        agg.set(key, a);
+      }
+
+      if (e.tipo === 'PUBLICA') {
+        a.pub++;
+        if (e.statusEstacao === 'ATIVO') a.pubAtivo++;
+        else if (e.statusEstacao === 'SOLICITADO') a.pubSolic++;
+        else if (e.statusEstacao === 'CANCELADO') a.pubCanc++;
+      } else if (e.tipo === 'PRIVADA') {
+        a.pri++;
+      } else if (e.tipo === 'CONCORRENTE') {
+        a.con++;
+      }
+    }
+
+    cityObj.builtSizes.set(cellSize, cells);
+    cityObj.builtAggSizes.set(cellSize, agg);
+    cityObj.lastSize = cellSize;
+  }
+
+  function queryGridIdxsByBounds_(cidadeKey, bounds, zoom) {
+    if (!bounds) return null;
+
+    const cellSize = cellSizeForZoom_(zoom || (map ? map.getZoom() : 12));
+    buildGridForCitySize_(cidadeKey, cellSize);
+
+    const cityObj = ensureGridCity_(cidadeKey);
+    const cells = cityObj.builtSizes.get(cellSize);
+    if (!cells) return null;
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    const cxMin = Math.floor((sw.lng() + 180) / cellSize);
+    const cxMax = Math.floor((ne.lng() + 180) / cellSize);
+    const cyMin = Math.floor((sw.lat() + 90) / cellSize);
+    const cyMax = Math.floor((ne.lat() + 90) / cellSize);
+
+    const out = [];
+    const seen = new Set();
+
+    for (let cx = cxMin; cx <= cxMax; cx++) {
+      for (let cy = cyMin; cy <= cyMax; cy++) {
+        const k = cx + '_' + cy;
+        const bucket = cells.get(k);
+        if (!bucket || !bucket.length) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          const idx = bucket[i];
+          if (!seen.has(idx)) { seen.add(idx); out.push(idx); }
+        }
+      }
+    }
+    return out;
+  }
+
+  function boundsFromCircle_(centerLat, centerLng, radiusMeters) {
+    const lat = Number(centerLat), lng = Number(centerLng);
+    const r = Number(radiusMeters);
+
+    const dLat = r / 111320;
+    const dLng = r / (111320 * Math.cos(lat * Math.PI / 180));
+
+    const sw = new google.maps.LatLng(lat - dLat, lng - dLng);
+    const ne = new google.maps.LatLng(lat + dLat, lng + dLng);
+    return new google.maps.LatLngBounds(sw, ne);
+  }
+
+  function ensureCityCache_(cidade) {
+    const key = cidade || "__ALL__";
+    if (perf.cacheByCity[key]) return perf.cacheByCity[key];
+
+    perf.cacheByCity[key] = {
+      markerByKey: new Map(),
+      circleByKey: new Map(),
+      activeKeys: new Set(),
+
+      polygonsLoaded: false,
+      polygonsMeta: [],
+      polygonsById: new Map(),
+      polygonsVisibleIds: new Set()
+    };
+    return perf.cacheByCity[key];
+  }
+
+  /* ===============================
+     MARKER/CIRCLE CACHE
+  ================================ */
+  // Mobile marker-lite (fast)
+  function buildLiteIcon_(fillColor){
+    // SymbolPath can be unavailable if called before Maps fully initializes
+    const circle = (google.maps && google.maps.SymbolPath && google.maps.SymbolPath.CIRCLE) ? google.maps.SymbolPath.CIRCLE : null;
+    if (!circle) return undefined; // fallback to default marker
+    return {
+      path: circle,
+      scale: 5,
+      fillColor: fillColor,
+      fillOpacity: 1,
+      strokeColor: 'rgba(0,0,0,.35)',
+      strokeOpacity: 0.9,
+      strokeWeight: 1
+    };
+  }
+
+  function pickLiteColor_(e){
+    const tipo = String(e.tipo || e.Tipo || '').toUpperCase();
+    const st = String(e.statusEstacao || e.status || e.Status || '').toUpperCase();
+
+    if (tipo === 'PUBLICA' && st === 'ATIVO') return '#22c55e';
+    if (tipo === 'PUBLICA' && st === 'SOLICITADO') return '#f59e0b';
+    if (tipo === 'PUBLICA' && st === 'CANCELADO') return '#ef4444';
+    if (tipo === 'CONCORRENTE') return '#60a5fa';
+    return '#9ca3af';
+  }
+
+  function ensureMarker_(cache, e) {
+    const key = e.__id;
+    let m = cache.markerByKey.get(key);
+    if (m) return m;
+
+    m = new google.maps.Marker({
+      position: { lat: Number(e.lat), lng: Number(e.lng) },
+      // Mobile: marker-lite for performance
+      icon: (IS_MOBILE && MOBILE_CFG.liteMarkers)
+        ? buildLiteIcon_(pickLiteColor_(e))
+        : icone(e.tipo, e.statusEstacao, e.modalidade),
+      optimized: true,
+      map: null
+    });
+
+    m.addListener('click', () => abrirInfo(e, m));
+    cache.markerByKey.set(key, m);
+    return m;
+  }
+
+  function ensureCircle_(cache, e, raio) {
+    const key = e.__id;
+    let c = cache.circleByKey.get(key);
+    if (c) return c;
+
+    const isConcorrente = e.tipo === 'CONCORRENTE';
+
+    c = new google.maps.Circle({
+      map: null,
+      center: { lat: Number(e.lat), lng: Number(e.lng) },
+      radius: raio,
+      fillColor: isConcorrente ? '#dc2626' : '#2563eb',
+      fillOpacity: 0.15,
+      strokeColor: isConcorrente ? '#991b1b' : '#1e40af',
+      strokeOpacity: 0.6,
+      strokeWeight: 1
+    });
+
+    cache.circleByKey.set(key, c);
+    return c;
+  }
+
+  function diffApplyActiveKeys_(cache, nextKeys, opts = { hideCirclesToo: true }) {
+    cache.activeKeys.forEach(key => {
+      if (nextKeys.has(key)) return;
+      const m = cache.markerByKey.get(key);
+      if (m) m.setMap(null);
+      if (opts.hideCirclesToo) {
+        const c = cache.circleByKey.get(key);
+        if (c) c.setMap(null);
+      }
+      cache.activeKeys.delete(key);
+    });
+
+    nextKeys.forEach(key => cache.activeKeys.add(key));
+  }
+
+  /* ===============================
+     MODALIDADE MATCH + BUSCA
+  ================================ */
+  function matchModalidade_(e) {
+    const m = e.modalidade;
+    if (m === 'PATINETE') return !!elChkPatinete?.checked;
+    if (m === 'BIKE')     return !!elChkBike?.checked;
+    if (m === 'HIBRIDA')  return !!elChkHibrida?.checked;
+    return true;
+  }
+
+  function matchBuscaFast_(e) {
+    if (!SEARCH_Q) return true;
+    const blob =
+      ((e.codigo || '') + ' ' +
+       (e.bairro || '') + ' ' +
+       (e.endereco || '') + ' ' +
+       (e.cidade || '')).toString().toLowerCase();
+    return blob.includes(SEARCH_Q);
+  }
+
+  /* ===============================
+     JET CROSS
+  ================================ */
+  let jetCrossMarkers = [];
+
+  function iconeJetCross(status) {
+    if (status === 'NOVO') return 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png';
+    return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+  }
+
+  function limparJetCross() {
+    jetCrossMarkers.forEach(m => m.setMap(null));
+    jetCrossMarkers = [];
+  }
+
+  function aplicarFitJetCross() {
+    if (jetCrossFitAplicado) return;
+    if (!jetCrossMarkers.length) return;
+    jetCrossFitAplicado = true;
+
+    if (jetCrossMarkers.length === 1) {
+      map.setCenter(jetCrossMarkers[0].getPosition());
+      map.setZoom(15);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    jetCrossMarkers.forEach(m => bounds.extend(m.getPosition()));
+    map.fitBounds(bounds);
+  }
+
+  function renderJetCross() {
+    if (IS_MOBILE && MOBILE_CFG.disableJetCross) { return; }
+    limparJetCross();
+    jetCrossFitAplicado = false;
+
+    if (!elChkJetCross?.checked) return;
+
+    const cidade = elCidade ? elCidade.value : '';
+
+    google.script.run
+    .withSuccessHandler(function(dados) {
+      if (!Array.isArray(dados)) return;
+
+      dados.forEach(function(d) {
+        if (!d.lat || !d.lng) return;
+
+        const marker = new google.maps.Marker({
+          position: { lat: d.lat, lng: d.lng },
+          map: map,
+          icon: iconeJetCross(d.statusComparacao)
+        });
+
+        marker.addListener('mouseover', function() {
+          const html = `
+            <div class="iwCard">
+              <div class="iwHead">Jet Cross</div>
+              <div class="iwBody">
+                Status: <b>${escapeHtml_(d.statusComparacao || '-')}</b><br/>
+                Origem: <b>${escapeHtml_(d.origem || '-')}</b>
+                ${d.codigo ? `<div class="iwMeta">Código: ${escapeHtml_(d.codigo)}</div>` : ``}
+              </div>
+            </div>
+          `;
+          infoWindow.setContent(html);
+          infoWindow.open(map, marker);
+        });
+
+        marker.addListener('mouseout', function() {
+          infoWindow.close();
+        });
+
+        jetCrossMarkers.push(marker);
+      });
+
+      aplicarFitJetCross();
+    })
+    .withFailureHandler(function(err) {
+      console.error('Jet Cross erro:', err);
+    })
+    .getJetCrossMapa(cidade);
+  }
+
+  // Dash
+  const enterprise = { btnDebug:null, dbgMs:null, dbgKey:null, pubSub:null, privSub:null, concSub:null };
+  const dash = {};
+
+  function initEnterpriseDash_(){
+    enterprise.btnDebug = document.getElementById('btnDebugToggle');
+    enterprise.dbgMs = document.getElementById('dbgRenderMs');
+    enterprise.dbgKey = document.getElementById('dbgRenderKey');
+
+    enterprise.pubSub = document.getElementById('dashPubSub');
+    enterprise.privSub = document.getElementById('dashPrivSub');
+    enterprise.concSub = document.getElementById('dashConcSub');
+
+    if (enterprise.btnDebug){
+      enterprise.btnDebug.addEventListener('click', () => {
+        const on = document.body.classList.toggle('debug');
+        enterprise.btnDebug.classList.toggle('on', on);
+      });
+    }
+
+    const filtersCard = document.getElementById('filtersCard');
+    if (filtersCard) filtersCard.setAttribute('data-scroll', 'soft');
+  }
+
+  function bindDash_(){
+    dash.banner = document.getElementById('dashBanner');
+    dash.modo = document.getElementById('dashModo');
+    dash.camada = document.getElementById('dashCamada');
+    dash.cidade = document.getElementById('dashCidade');
+    dash.zoom = document.getElementById('dashZoom');
+
+    dash.baseTotal = document.getElementById('dashBaseTotal');
+    dash.filtroTotal = document.getElementById('dashFiltroTotal');
+    dash.filtroPub = document.getElementById('dashFiltroPub');
+    dash.filtroPriv = document.getElementById('dashFiltroPriv');
+    dash.filtroConc = document.getElementById('dashFiltroConc');
+  }
+
+  function setTxt_(el, v){
+    if (!el) return;
+    el.textContent = (v===undefined || v===null || v==='') ? '—' : String(v);
+  }
+
+  function setBanner_(text, kind){
+    if (!dash || !dash.banner) return;
+    if (!text) {
+      dash.banner.style.display = 'none';
+      dash.banner.textContent = '';
+      dash.banner.className = 'dash-banner';
+      return;
+    }
+    dash.banner.style.display = 'block';
+    dash.banner.textContent = text;
+    dash.banner.className = 'dash-banner' + (kind ? ` ${kind}` : '');
+  }
+
+  function updateDashboardFromState_(s, metrics){
+    setTxt_(dash.modo, (s.mode === 'MACRO' ? 'Macro (Cidades)' : 'Micro (Estações)'));
+    setTxt_(dash.camada, (s.layer === 'JETCROSS' ? 'Jet Cross' : (s.layer === 'DUPLICIDADES' ? 'Duplicidades' : 'Normal')));
+    setTxt_(dash.cidade, (s.city||'').trim() || '—');
+    setTxt_(dash.zoom, s.zoom ?? (map?.getZoom?.() ?? '—'));
+
+    setTxt_(dash.baseTotal, (estacoes?.length ?? 0));
+
+    if (s.layer === 'JETCROSS') {
+      setBanner_('Jet Cross ativo: camada exclusiva. Polígonos/Raio desativados.', 'warn');
+    } else if (s.layer === 'DUPLICIDADES') {
+      setBanner_('Duplicidades ativo: camada exclusiva.', 'warn');
+    } else if (!s.canPolygons && s.polygons) {
+      setBanner_('Polígonos exigem cidade selecionada e zoom ≥ 12.', 'warn');
+    } else {
+      setBanner_('', '');
+    }
+
+    metrics = metrics || {};
+    setTxt_(dash.filtroTotal, metrics.filtroTotal ?? 0);
+    setTxt_(dash.filtroPub, metrics.filtroPub ?? 0);
+    setTxt_(dash.filtroPriv, metrics.filtroPriv ?? 0);
+    setTxt_(dash.filtroConc, metrics.filtroConc ?? 0);
+
+    if (enterprise.pubSub)  enterprise.pubSub.textContent  = (s.city ? 'Cidade filtrada' : 'Todas as cidades');
+    if (enterprise.privSub) enterprise.privSub.textContent = (s.city ? 'Cidade filtrada' : 'Todas as cidades');
+    if (enterprise.concSub) enterprise.concSub.textContent = (s.city ? 'Cidade filtrada' : 'Todas as cidades');
+
+    if (enterprise.dbgMs)  enterprise.dbgMs.textContent  = (metrics.renderMs != null ? `${metrics.renderMs}ms` : '—');
+    if (enterprise.dbgKey) enterprise.dbgKey.textContent = (metrics.lastKey || '—');
+  }
+
+  /* ===============================
+     INIT MAP
+  ================================ */
+  
+
+  /*******************  ADD MODE (ADVANCED)  *******************/
+  const ADD = {
+    enabled: false,
+    unlocked: false,
+    pin: null,
+    ac: null,
+    geocoder: null,
+    lastGeo: { endereco:"", cidade:"", bairro:"", estado:"", pais:"", alcaldia:"" },
+    lastGeocodeAt: 0,
+    geocodeTimer: null,
+
+    init(map){
+      this.map = map;
+      this.geocoder = new google.maps.Geocoder();
+
+      // DOM refs (tolerant)
+      this.btnToggle = document.getElementById('btnToggleAddMode');
+      this.lblToggle = document.getElementById('lblAddMode');
+      this.btnHelp   = document.getElementById('btnAddHelp');
+      this.dock = document.getElementById('addDock');
+
+      this.gate = document.getElementById('addGate');
+      this.pass = document.getElementById('addPass');
+      this.btnUnlock = document.getElementById('btnUnlockAdd');
+      this.gateErr = document.getElementById('addGateErr');
+
+      this.form = document.getElementById('addForm');
+      this.search = document.getElementById('addSearch');
+      this.lat = document.getElementById('addLat');
+      this.lng = document.getElementById('addLng');
+      this.btnGo = document.getElementById('btnGoCoords');
+      this.btnMyLoc = document.getElementById('btnAddMyLoc');
+      this.btnClear = document.getElementById('btnClearPin');
+
+      this.pillAddr = document.getElementById('pillAddr');
+      this.pillCity = document.getElementById('pillCity');
+      this.pillBairro = document.getElementById('pillBairro');
+
+      this.tipo = document.getElementById('addTipo');
+      this.status = document.getElementById('addStatus');
+      this.nomeConc = document.getElementById('addNomeConcorrente');
+      this.modalidade = document.getElementById('addModalidade');
+      this.obs = document.getElementById('addObs');
+      this.foto = document.getElementById('addFoto');
+      this.wrapStatus = document.getElementById('wrapAddStatus');
+      this.wrapConc = document.getElementById('wrapAddConc');
+
+      this.btnLock = document.getElementById('btnLockAdd');
+      this.btnSave = document.getElementById('btnSaveEstacao');
+      this.ok = document.getElementById('addOk');
+      this.err = document.getElementById('addErr');
+
+      if (!this.btnToggle || !this.dock) return; // no crash
+
+      this.btnToggle.addEventListener('click', () => this.setEnabled(!this.enabled));
+      if (this.btnHelp) this.btnHelp.addEventListener('click', () => {
+        alert('Add Mode\n\n1) Ligue Add Mode\n2) Libere com senha\n3) Busque pelo endereço ou clique no mapa\n4) Arraste o pin para ajustar\n5) Salve (opcional foto)');
+      });
+
+      if (this.btnUnlock) this.btnUnlock.addEventListener('click', () => this.unlock());
+      if (this.btnLock) this.btnLock.addEventListener('click', () => this.lock(false));
+      if (this.btnGo) this.btnGo.addEventListener('click', () => this.goCoords());
+      if (this.btnMyLoc) this.btnMyLoc.addEventListener('click', () => this.useMyLocation());
+      if (this.btnClear) this.btnClear.addEventListener('click', () => this.clearPin());
+      if (this.tipo) this.tipo.addEventListener('change', () => this.refreshTipoUI());
+      if (this.btnSave) this.btnSave.addEventListener('click', () => this.save());
+
+      // Map click -> place pin
+      this.mapClickListener = this.map.addListener('click', (e) => {
+        if (!this.enabled || !this.unlocked) return;
+        this.placeOrMovePin(e.latLng);
+        this.reverseGeocodeDebounced_(e.latLng);
+      });
+
+      this.initPlaces_();
+      this.setEnabled(false);
+      this.lock(true);
+    },
+
+    setEnabled(v){
+      this.enabled = !!v;
+      if (this.lblToggle) this.lblToggle.textContent = this.enabled ? 'ON' : 'OFF';
+
+      // Show/hide dock (double-guard: hidden + display) to avoid edge cases
+      if (this.dock){
+        this.dock.hidden = !this.enabled;
+        this.dock.style.display = this.enabled ? 'block' : 'none';
+      }
+
+      // Quick guide bubble on enable (doesn't block)
+      if (this.enabled) this.openGuide_('Add Mode ligado. Digite a senha para liberar. Depois clique no mapa (ou use Places) para criar o pin.');
+
+      if (!this.enabled) this.lock(true);
+    },
+
+    lock(silent){
+      this.unlocked = false;
+      if (this.form) this.form.style.display = 'none';
+      if (this.gate) this.gate.style.display = '';
+      this.clearPin();
+      this.clearMsgs_();
+      if (!silent) this.setOk_('Add Mode bloqueado.');
+    },
+
+    async unlock(){
+      this.clearMsgs_();
+      const pass = (this.pass?.value || '').trim();
+      if (!pass) return this.setGateErr_('Informe a senha.');
+
+      const ok = await this.callValidatePass_(pass);
+      if (!ok) return this.setGateErr_('Senha inválida.');
+
+      this.unlocked = true;
+      if (this.gate) this.gate.style.display = 'none';
+      if (this.form) this.form.style.display = '';
+      this.refreshTipoUI();
+
+      // Create an initial pin at map center so the user immediately sees the draggable marker (AppSheet-like)
+      try{
+        const c = this.map?.getCenter?.();
+        if (c) this.placeOrMovePin(c);
+      }catch(e){}
+
+      this.setOk_('Liberado. Arraste o pin (ou clique no mapa) e então Salvar.');
+      this.openGuide_('Liberado! Arraste o pin para o ponto exato. O endereço será preenchido automaticamente.');
+
+    },
+
+    refreshTipoUI(){
+      const t = (this.tipo?.value || 'PUBLICA');
+      const isPub = t === 'PUBLICA';
+      const isConc = t === 'CONCORRENTE';
+      if (this.wrapStatus) this.wrapStatus.style.display = isPub ? '' : 'none';
+      if (this.wrapConc) this.wrapConc.style.display = isConc ? '' : 'none';
+    },
+
+    initPlaces_(){
+      try{
+        if (!this.search) return;
+        if (!google?.maps?.places?.Autocomplete) return;
+        this.ac = new google.maps.places.Autocomplete(this.search, {
+          fields: ['geometry','formatted_address','address_components','name'],
+          types: ['geocode']
+        });
+        this.ac.addListener('place_changed', () => {
+          const p = this.ac.getPlace();
+          if (!p?.geometry?.location) return;
+          const ll = p.geometry.location;
+          this.placeOrMovePin(ll);
+          const geo = this.mapAddressComponents_(p.address_components || []);
+          this.applyGeo_(geo, p.formatted_address || p.name || '');
+        });
+      }catch(err){
+        console.warn('Places init failed:', err);
+      }
+    },
+
+    goCoords(){
+      this.clearMsgs_();
+      const lat = Number(this.lat?.value);
+      const lng = Number(this.lng?.value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return this.setErr_('Lat/Lng inválidos.');
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return this.setErr_('Lat/Lng fora do range.');
+      const ll = new google.maps.LatLng(lat, lng);
+      this.placeOrMovePin(ll);
+      this.reverseGeocodeDebounced_(ll);
+    },
+
+    useMyLocation(){
+      this.clearMsgs_();
+      if (!navigator.geolocation) return this.setErr_('Geolocalização indisponível.');
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const ll = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+        this.placeOrMovePin(ll);
+        this.reverseGeocodeDebounced_(ll);
+      }, () => this.setErr_('Falha ao obter localização.'));
+    },
+
+    placeOrMovePin(latLng){
+      if (!this.pin){
+        const icon = {
+  path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
+  fillColor: "#60a5fa",
+  fillOpacity: 0.95,
+  strokeColor: "#0b1220",
+  strokeWeight: 2,
+  scale: 1.4,
+  anchor: new google.maps.Point(12, 24),
+};
+
+        this.pin = new google.maps.Marker({
+          position: latLng,
+          map: this.map,
+          draggable: true,
+          title: 'Nova estação',
+          icon
+        });
+        this.pin.addListener('dragend', (e) => {
+          const ll = e.latLng;
+          this.syncLatLng_(ll);
+          this.reverseGeocodeDebounced_(ll);
+        });
+      } else {
+        this.pin.setPosition(latLng);
+        this.pin.setMap(this.map);
+      }
+      this.syncLatLng_(latLng);
+      this.map.panTo(latLng);
+      if ((this.map.getZoom() || 0) < 16) this.map.setZoom(16);
+    },
+
+    clearPin(){
+      if (this.pin){ this.pin.setMap(null); this.pin = null; }
+      if (this.lat) this.lat.value = '';
+      if (this.lng) this.lng.value = '';
+      this.applyGeo_({ endereco:'', cidade:'', bairro:'', estado:'', pais:'', alcaldia:'' }, '');
+      if (this.search) this.search.value = '';
+      if (this.foto) this.foto.value = '';
+    },
+
+    syncLatLng_(ll){
+      if (!ll) return;
+      if (this.lat) this.lat.value = +ll.lat().toFixed(7);
+      if (this.lng) this.lng.value = +ll.lng().toFixed(7);
+    },
+
+    reverseGeocodeDebounced_(ll){
+      const now = Date.now();
+      if (now - this.lastGeocodeAt < 700){
+        clearTimeout(this.geocodeTimer);
+        this.geocodeTimer = setTimeout(() => this.reverseGeocode_(ll), 700);
+        return;
+      }
+      this.reverseGeocode_(ll);
+    },
+
+    reverseGeocode_(ll){
+      if (!this.geocoder) return;
+      this.lastGeocodeAt = Date.now();
+      this.geocoder.geocode({ location: ll }, (results, status) => {
+        if (status !== 'OK' || !results?.length) return;
+        const r = results[0];
+        const geo = this.mapAddressComponents_(r.address_components || []);
+        this.applyGeo_(geo, r.formatted_address || '');
+      });
+    },
+
+    mapAddressComponents_(comps){
+      const out = { pais:'', estado:'', cidade:'', bairro:'', endereco:'', alcaldia:'' };
+      const get = (type) => {
+        const c = comps.find(x => (x.types || []).includes(type));
+        return c ? (c.long_name || c.short_name || '') : '';
+      };
+      out.pais = get('country');
+      out.estado = get('administrative_area_level_1');
+      out.cidade = get('locality') || get('administrative_area_level_2') || get('postal_town');
+      out.bairro = get('sublocality') || get('sublocality_level_1') || get('neighborhood');
+      out.alcaldia = get('administrative_area_level_3') || '';
+      return out;
+    },
+
+    applyGeo_(geo, formattedAddr){
+      this.lastGeo = {
+        pais: geo?.pais || '',
+        estado: geo?.estado || '',
+        cidade: geo?.cidade || '',
+        bairro: geo?.bairro || '',
+        endereco: formattedAddr || geo?.endereco || '',
+        alcaldia: geo?.alcaldia || ''
+      };
+      if (this.pillAddr) this.pillAddr.textContent = 'Endereço: ' + (this.lastGeo.endereco || '—');
+      if (this.pillCity) this.pillCity.textContent = 'Cidade: ' + (this.lastGeo.cidade || '—');
+      if (this.pillBairro) this.pillBairro.textContent = 'Bairro: ' + (this.lastGeo.bairro || '—');
+    },
+
+    canSaveInCurrentLayer_(){
+      // Seu app usa LAYERS; tolerante: só bloqueia se encontrar algo explícito
+      const layer = (window.MAP_STATE?.layer || window.state?.layer || window.currentLayer || 'NORMAL');
+      return String(layer).toUpperCase() === 'NORMAL';
+    },
+
+    async save(){
+      this.clearMsgs_();
+      if (!this.enabled || !this.unlocked) return this.setErr_('Add Mode não liberado.');
+      if (!this.canSaveInCurrentLayer_()) return this.setErr_('Troque para Layer NORMAL para salvar.');
+
+      const lat = Number(this.lat?.value);
+      const lng = Number(this.lng?.value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return this.setErr_('Lat/Lng obrigatórios.');
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return this.setErr_('Lat/Lng fora do range.');
+
+      const tipo = (this.tipo?.value || '').trim();
+      const modalidade = (this.modalidade?.value || '').trim();
+      const status = (this.status?.value || '').trim();
+      const nomeConcorrente = (this.nomeConc?.value || '').trim();
+      const observacoes = (this.obs?.value || '').trim();
+
+      if (!tipo) return this.setErr_('Tipo obrigatório.');
+      if (!modalidade) return this.setErr_('Modalidade obrigatória.');
+      if (tipo === 'PUBLICA' && !status) return this.setErr_('Status obrigatório para pública.');
+      if (tipo === 'CONCORRENTE' && !nomeConcorrente) return this.setErr_('Nome do concorrente obrigatório.');
+      if (!this.lastGeo?.cidade) return this.setErr_('Cidade não detectada. Use Places ou clique no mapa.');
+      if (!this.lastGeo?.endereco) return this.setErr_('Endereço não detectado. Use Places ou clique no mapa.');
+      if (observacoes.length > 500) return this.setErr_('Observações: máximo 500 caracteres.');
+
+      const payload = {
+        lat, lng,
+        tipo,
+        modalidade,
+        status: (tipo === 'PUBLICA' ? status : ''),
+        observacoes,
+        nomeConcorrente: (tipo === 'CONCORRENTE' ? nomeConcorrente : ''),
+        geo: {
+          pais: this.lastGeo.pais || '',
+          estado: this.lastGeo.estado || '',
+          cidade: this.lastGeo.cidade || '',
+          bairro: this.lastGeo.bairro || '',
+          endereco: this.lastGeo.endereco || '',
+          alcaldia: this.lastGeo.alcaldia || ''
+        },
+        foto: null
+      };
+
+      // Foto (compress + base64) no fluxo estilo Forms
+      const file = this.foto?.files?.[0];
+      if (file){
+        if (!file.type?.startsWith('image/')) return this.setErr_('Foto inválida.');
+        const compressed = await this.compressImage_(file, 1280, 0.82);
+        if (compressed.size > 3 * 1024 * 1024) return this.setErr_('Foto ainda muito grande (>3MB). Salve sem foto.');
+        payload.foto = await this.fileToBase64_(compressed);
+      }
+
+      this.setOk_('Salvando…');
+      const res = await this.callAddEstacao_(payload);
+      if (!res?.ok) return this.setErr_(res?.error || 'Falha ao salvar.');
+
+      this.setOk_('Salvo! Atualizando mapa…');
+      try{
+        const e = res.estacao;
+        if (Array.isArray(window.estacoes)) window.estacoes.push(e);
+
+        const cityKey = (e?.cidade || e?.cidadeKey || payload.geo.cidade || '').toString();
+        if (window.estacoesPorCidade){
+          if (window.estacoesPorCidade instanceof Map){
+            const arr = window.estacoesPorCidade.get(cityKey) || [];
+            arr.push(e);
+            window.estacoesPorCidade.set(cityKey, arr);
+          } else {
+            window.estacoesPorCidade[cityKey] = window.estacoesPorCidade[cityKey] || [];
+            window.estacoesPorCidade[cityKey].push(e);
+          }
+        }
+
+        if (window.perf?.gridByCity){
+          const g = window.perf.gridByCity.get?.(cityKey) || window.perf.gridByCity[cityKey];
+          if (g?.builtSizes?.clear) g.builtSizes.clear();
+          if (g?.builtAggSizes?.clear) g.builtAggSizes.clear();
+        }
+
+        if (typeof window.renderDebounced_ === 'function') window.renderDebounced_(true);
+        else if (typeof window.safeRenderRequest_ === 'function') window.safeRenderRequest_(true);
+        else if (typeof window.render === 'function') window.render();
+
+        this.setOk_('Atualizado!');
+      }catch(err){
+        console.warn('Post-save inject failed:', err);
+        this.setOk_('Salvo (mapa atualiza no próximo render).');
+      }
+    },
+
+    fileToBase64_(file){
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onerror = reject;
+        fr.onload = () => {
+          const dataUrl = String(fr.result || '');
+          const base64 = dataUrl.split(',')[1] || '';
+          resolve({ name: file.name || 'foto.jpg', mime: file.type || 'image/jpeg', base64 });
+        };
+        fr.readAsDataURL(file);
+      });
+    },
+
+    compressImage_(file, maxSide, quality){
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const w = img.width, h = img.height;
+          const scale = Math.min(1, maxSide / Math.max(w,h));
+          const cw = Math.round(w * scale);
+          const ch = Math.round(h * scale);
+          const canvas = document.createElement('canvas');
+          canvas.width = cw; canvas.height = ch;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, cw, ch);
+          canvas.toBlob((blob) => {
+            URL.revokeObjectURL(url);
+            if (!blob) return reject(new Error('Falha ao comprimir imagem'));
+            // keep filename but change type if needed
+            const out = new File([blob], file.name || 'foto.jpg', { type: blob.type || 'image/jpeg' });
+            resolve(out);
+          }, 'image/jpeg', quality || 0.82);
+        };
+        img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+        img.src = url;
+      });
+    },
+
+    callValidatePass_(pass){
+      if (window.google?.script?.run && google.script.run.validateAddPass){
+        return new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler((ok) => resolve(!!ok))
+            .withFailureHandler(() => resolve(false))
+            .validateAddPass(pass);
+        });
+      }
+      return Promise.resolve(false);
+    },
+
+    callAddEstacao_(payload){
+      if (window.google?.script?.run && google.script.run.addEstacaoFromMapa){
+        return new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler((res) => resolve(res))
+            .withFailureHandler((e) => resolve({ ok:false, error: String(e?.message || e) }))
+            .addEstacaoFromMapa(payload);
+        });
+      }
+      return Promise.resolve({ ok:false, error:'Backend não publicado com addEstacaoFromMapa().' });
+    },
+
+    clearMsgs_(){
+      if (this.ok) this.ok.style.display = 'none';
+      if (this.err) this.err.style.display = 'none';
+      if (this.gateErr) this.gateErr.style.display = 'none';
+    },
+    setGateErr_(msg){
+      if (!this.gateErr) return;
+      this.gateErr.textContent = msg;
+      this.gateErr.style.display = '';
+    },
+    setOk_(msg){
+      if (!this.ok) return;
+      this.ok.textContent = msg;
+      this.ok.style.display = '';
+      if (this.err) this.err.style.display = 'none';
+    },
+    setErr_(msg){
+      if (!this.err) return;
+      this.err.textContent = msg;
+      this.err.style.display = '';
+      if (this.ok) this.ok.style.display = 'none';
+    }
+  };
+  // ===============================
+  // MOBILE LAZY LOAD BY CITY (SAFE FALLBACK)
+  // ===============================
+  function serverGet_(fn, arg){
+    return new Promise((resolve) => {
+      if (!window.google?.script?.run || !google.script.run[fn]) return resolve(null);
+      const runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((e) => { console.warn(fn+' failed', e); resolve(null); });
+      arg !== undefined ? runner[fn](arg) : runner[fn]();
+    });
+  }
+
+  async function loadInitialData_(){
+  // Always try to pre-populate cities index ASAP (desktop + mobile).
+  // This avoids "Cidade" dropdown staying empty if full dataset is delayed/fails.
+  (async () => {
+    try {
+      const idx = await serverGet_('getCitiesIndex');
+      if (Array.isArray(idx) && idx.length) {
+        window.__CITIES_INDEX__ = idx;
+        populateCitiesFromIndex_(idx);
+      }
+    } catch (e) { /* ignore */ }
+  })();
+
+  // Mobile: prefer lazy-by-city when backend supports it
+  if (IS_MOBILE && MOBILE_CFG.cityLazyLoad){
+    const idx = await serverGet_('getCitiesIndex');
+    if (Array.isArray(idx) && idx.length){
+      window.__CITIES_INDEX__ = idx;
+      try { populateCitiesFromIndex_(idx); } catch(e){}
+      estacoes = [];
+      try { if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true); else renderDebounced_(true); } catch(e){}
+      return;
+    }
+  }
+
+  // Default: full load (desktop or fallback)
+  if (!window.google?.script?.run || !google.script.run.getEstacoesWebApp){
+    console.warn('google.script.run.getEstacoesWebApp não disponível');
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(onData)
+    .withFailureHandler(err => {
+      console.error('getEstacoesWebApp erro:', err);
+      // If we have cities index, at least keep dropdown usable
+      try {
+        if (!elCidade?.options?.length || elCidade.options.length <= 1) {
+          if (Array.isArray(window.__CITIES_INDEX__) && window.__CITIES_INDEX__.length) {
+            populateCitiesFromIndex_(window.__CITIES_INDEX__);
+          }
+        }
+      } catch(e){}
+    })
+    .getEstacoesWebApp();
+}
+
+  function resetPxSelectWrap_(sel){
+    try{
+      if (!sel) return;
+      const wrap = sel.closest('.pxSelectWrap, .pxCityWrap');
+      if (!wrap) return;
+      const parent = wrap.parentNode;
+      if (!parent) return;
+      parent.insertBefore(sel, wrap);
+      wrap.remove();
+      sel.style.display = '';
+      sel.style.position = '';
+      sel.style.left = '';
+      sel.style.pointerEvents = '';
+      try { if (sel.dataset){ delete sel.dataset.pxEnhanced; delete sel.dataset.pxCityForced; } } catch(e){}
+    } catch(e){}
+  }
+
+  function populateCitiesFromIndex_(idx){
+    elCidade = elCidade || document.getElementById("cidadeFilter");
+    if (!elCidade) return;
+    const current = elCidade.value || '';
+    elCidade.innerHTML = '';
+    const opt0 = document.createElement('option');
+    opt0.value = '';
+    opt0.textContent = 'Todas as cidades';
+    elCidade.appendChild(opt0);
+
+    idx.forEach(c => {
+      const name = c.cidade || c.city || c.name || c.cityKey || '';
+      if (!name) return;
+      const opt = document.createElement('option');
+      opt.value = (IS_MOBILE && MOBILE_CFG.cityLazyLoad ? (c.cityKey || name) : name);
+      opt.textContent = name;
+      elCidade.appendChild(opt);
+    });
+
+    if (current) elCidade.value = current;
+    // If using custom select UI, rebuild it AFTER options update
+    try { resetPxSelectWrap_(elCidade); } catch(e){}
+    try { enhanceAllSelectsPremium_(); } catch(e){}
+  }
+
+  async function ensureCityLoadedMobile_(cityKey){
+    if (!(IS_MOBILE && MOBILE_CFG.cityLazyLoad)) return false;
+    if (!cityKey) return false;
+
+    window.__CITY_CACHE__ = window.__CITY_CACHE__ || {};
+    if (Array.isArray(window.__CITY_CACHE__[cityKey])) {
+      estacoes = window.__CITY_CACHE__[cityKey];
+      return true;
+    }
+
+    const data = await serverGet_('getEstacoesByCity', cityKey);
+    if (Array.isArray(data)) {
+      window.__CITY_CACHE__[cityKey] = data;
+      estacoes = data;
+      return true;
+    }
+    return false;
+  }
+
+
+
+  function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: -14.235, lng: -51.925 },
+      zoom: 5,
+      gestureHandling: IS_MOBILE ? 'greedy' : 'auto'
+    });
+
+    infoWindow = new google.maps.InfoWindow();
+
+    try { ADD.init(map); } catch(e){ console.warn('ADD init failed', e); }
+
+    // interaction lock
+    map.addListener('dragstart', () => { isInteracting = true; });
+    map.addListener('drag',      () => { isInteracting = true; });
+    map.addListener('zoom_changed', () => { isInteracting = true; });
+
+    let idleTimer_ = null;
+    let lastViewportKey_ = '';
+
+    function viewportKey_() {
+      const b = map.getBounds();
+      if (!b) return '';
+      const sw = b.getSouthWest(), ne = b.getNorthEast();
+      return [
+        map.getZoom() || 0,
+        sw.lat().toFixed(4), sw.lng().toFixed(4),
+        ne.lat().toFixed(4), ne.lng().toFixed(4),
+        !!MAP_STATE?.radius,
+        Number(elRaioInput?.value || 200),
+        (elCidade?.value || ''),
+        (SEARCH_Q || ''),
+        (MAP_STATE?.layer || 'NORMAL'),
+        !!MAP_STATE?.polygons,
+        !!MAP_STATE?.canPolygons
+      ].join('|');
+    }
+
+    map.addListener('idle', () => {
+      isInteracting = false;
+
+      clearTimeout(idleTimer_);
+      idleTimer_ = setTimeout(() => {
+        const k = viewportKey_();
+        if (k && k === lastViewportKey_) return;
+        lastViewportKey_ = k;
+
+        dispatch_('MAP_IDLE', { zoom: map.getZoom() || 0 });
+
+        try { atualizarViewport(); } catch(e){}
+        try { renderPoligonos(); } catch(e){}
+        try { if (!isInteracting) renderDebounced_(false); } catch(e){}
+      }, 140);
+    });
+
+    map.addListener('zoom_changed', () => {
+      if (map.getZoom() <= ZOOM_LIMITE_CIDADE && !elCidade?.value) entrouPorCidade = false;
+    });
+
+    
+    // Init FSM early (needed for mobile hard-block)
+    try { if (!MAP_STATE) initFSM_(); } catch(e){}
+    try { enforceMobileLayers_(); } catch(e){}
+
+    // Data loading (mobile: lazy by city if backend supports it)
+    loadInitialData_();
+
+
+    map.addListener('click', () => {
+      if (!IS_MOBILE) return;
+      if (!sidebarEl) return;
+
+      document.documentElement.style.setProperty('--sheet-h', '76px');
+      sidebarEl.classList.add('is-collapsed');
+      if (btnCollapse) btnCollapse.textContent = '⟨';
+      triggerMapResizeDebounced_();
+    });
+  }
+
+  function parseCoord_(v){
+    if (v == null) return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const s = String(v).trim();
+    if (!s) return null;
+    const n = Number(s.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normModalidade_(v){
+    const s0 = (v ?? '').toString().trim();
+    if (!s0) return 'PATINETE';
+
+    const s = s0.toUpperCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    if (s.includes('BIKE') || s.includes('BICI') || s.includes('BICICLETA')) return 'BIKE';
+    if (s.includes('HIBR') || s.includes('HYBR') || s.includes('MIST')) return 'HIBRIDA';
+    if (s.includes('PATIN')) return 'PATINETE';
+    return 'PATINETE';
+  }
+
+  function onData(data) {
+    if (data && data.ok===false) {
+      console.error('[BASE] Erro getEstacoesWebApp:', data.error || data);
+      toast('Erro ao carregar base: ' + (data.error || 'ver console/logs do Apps Script'));
+      estacoes = [];
+    } else {
+      estacoes = Array.isArray(data) ? data : [];
+      if (!Array.isArray(data)) console.warn('[BASE] Resposta inesperada getEstacoesWebApp:', data);
+    }
+
+    function pick_(obj, keys){
+      for (const k of keys){
+        if (obj && obj[k] != null && String(obj[k]).trim() !== '') return obj[k];
+      }
+      return null;
+    }
+
+    function normStatus_(v){
+      const s = (v ?? '').toString().trim().toUpperCase();
+      if (!s) return '';
+      if (s === 'ATIVA') return 'ATIVO';
+      if (s === 'SOLICITADA') return 'SOLICITADO';
+      if (s === 'CANCELADA') return 'CANCELADO';
+      return s;
+    }
+
+    estacoes.forEach(e => {
+      const rawMod = pick_(e, ['modalidade','Modalidade','Mobilidade','mobilidade','MODALIDADE','MOBILIDADE']);
+      e.modalidade = normModalidade_(rawMod);
+
+      const rawCity = pick_(e, ['cidade','Cidade','city','City','municipio','Município','Municipio']);
+      e.cidade = rawCity == null ? '' : String(rawCity).trim();
+
+      e.tipo = (pick_(e, ['tipo','Tipo']) ?? '').toString().trim().toUpperCase();
+      e.statusEstacao = normStatus_(pick_(e, ['statusEstacao','status','Status']));
+
+      if (e.subprefeitura != null) e.subprefeitura = String(e.subprefeitura).trim();
+
+      const rawLat = pick_(e, ['lat','Lat','latitude','Latitude','LAT']);
+      const rawLng = pick_(e, ['lng','Lng','lon','Lon','longitude','Longitude','LNG','LON']);
+      e.lat = parseCoord_(rawLat);
+      e.lng = parseCoord_(rawLng);
+    });
+
+    estacoes = estacoes.filter(e => e.lat != null && e.lng != null);
+
+    estacoes.forEach((e) => {
+      if (e.__id) return;
+      const cod = (e.codigo || '').toString().trim();
+      if (cod) { e.__id = 'COD:' + cod; return; }
+      const end = (e.endereco || '').toString().trim().slice(0, 60);
+      const cid = (e.cidade || '').toString().trim();
+      const tipo = (e.tipo || '').toString().trim();
+      const mod  = (e.modalidade || '').toString().trim();
+      e.__id = `FALL:${cid}|${tipo}|${mod}|${e.lat}|${e.lng}|${end}`;
+    });
+
+    agruparEstacoesPorCidade();
+    popularCidades();
+    popularSubprefeituras();
+
+    if (lblBaseCount) lblBaseCount.textContent = String(estacoes.length);
+
+    // ✅ render só via scheduler seguro (evita crash se DOM ainda bindando)
+    safeRenderRequest_(true);
+  }
+
+  /* ===============================
+     ICONES
+  ================================ */
+  function baseColorByTipoStatus_(tipo, status) {
+    if (tipo === 'PUBLICA') {
+      if (status === 'ATIVO') return '#2563eb';
+      if (status === 'SOLICITADO') return '#60a5fa';
+      return '#6b7280';
+    }
+    if (tipo === 'PRIVADA') return '#16a34a';
+    if (tipo === 'CONCORRENTE') return '#dc2626';
+    return '#111827';
+  }
+
+  function symbolPathByModalidade_(modalidade) {
+    const m = (modalidade || 'PATINETE').toString().trim().toUpperCase();
+    if (m === 'HÍBRIDA' || m === 'HIBRIDA') return "M 0,-1 L 1,0 L 0,1 L -1,0 Z";
+    if (m === 'BICICLETA' || m === 'BICI' || m === 'BIKE') return "M -1,-1 L 1,-1 L 1,1 L -1,1 Z";
+    return google.maps.SymbolPath.CIRCLE;
+  }
+
+  function icone(tipo, status, modalidade) {
+    const fill = baseColorByTipoStatus_(tipo, status);
+    const path = symbolPathByModalidade_(modalidade);
+    const isCircle = (path === google.maps.SymbolPath.CIRCLE);
+    const scale = isCircle ? 7 : 10;
+
+    return {
+      path,
+      scale,
+      fillColor: fill,
+      fillOpacity: 0.95,
+      strokeColor: '#111827',
+      strokeOpacity: 0.9,
+      strokeWeight: 1
+    };
+  }
+
+  /* ===============================
+     CLUSTER HELPERS
+  ================================ */
+  function criarCluster(markers) {
+    const MC =
+      (window.markerClusterer && window.markerClusterer.MarkerClusterer) ||
+      (window.MarkerClusterer) ||
+      null;
+
+    if (!MC) return null;
+    if (entrouPorCidade) return null;
+    if (map.getZoom() >= 14) return null;
+
+    return new MC({ map, markers, algorithmOptions: CLUSTER_CFG });
+  }
+
+  function clearClusters_() {
+    [clusterPublica, clusterPrivada, clusterConcorrente].forEach(c => {
+      if (!c) return;
+      try { c.clearMarkers?.(); } catch(e){}
+      try { c.setMap?.(null); } catch(e){}
+    });
+    clusterPublica = null; clusterPrivada = null; clusterConcorrente = null;
+  }
+
+  function hardResetLayers_(){
+    markersCidade.forEach(m => m.setMap(null));
+    markersCidade = [];
+    clearClusters_();
+    hideActiveCity_(elCidade?.value || null);
+    hideActiveCity_(null);
+    limparViewportCircle();
+    infoWindow?.close();
+  }
+
+  let _mapResizeTO = null;
+  function triggerMapResizeDebounced_(){
+    if (!map) return;
+    clearTimeout(_mapResizeTO);
+    _mapResizeTO = setTimeout(() => {
+      try { google.maps.event.trigger(map, 'resize'); } catch(e){}
+    }, 180);
+  }
+
+  function hideActiveCity_(cidadeKey){
+    try{
+      const cache = ensureCityCache_(cidadeKey || null);
+      if (!cache) return;
+
+      if (cache.activeKeys && cache.markerByKey){
+        cache.activeKeys.forEach(k => {
+          const m = cache.markerByKey.get(k);
+          if (m) m.setMap(null);
+        });
+        cache.activeKeys.clear();
+      }
+
+      if (cache.circleByKey){
+        cache.circleByKey.forEach(c => { if (c) c.setMap(null); });
+      }
+
+      if (cache.polygonsById){
+        cache.polygonsById.forEach(p => { if (p) p.setMap(null); });
+      }
+      if (cache.polygonsVisibleIds) cache.polygonsVisibleIds.clear();
+    }catch(e){
+      console.warn('hideActiveCity_ error:', e);
+    }
+  }
+
+  /* ===============================
+     UI POPULATE
+  ================================ */
+  function popularCidades() {
+  if (!elCidade) return;
+
+  // ✅ Se ainda não temos estações (ou veio vazio), mas temos índice de cidades,
+  // NÃO derruba o dropdown (evita ficar só "Todas as cidades").
+  if ((!Array.isArray(estacoes) || estacoes.length === 0) && Array.isArray(window.__CITIES_INDEX__) && window.__CITIES_INDEX__.length){
+    try { populateCitiesFromIndex_(window.__CITIES_INDEX__); } catch(e){}
+    return;
+  }
+
+  elCidade.innerHTML = `<option value="">Todas as cidades</option>`;
+  [...new Set(estacoes.map(e => e.cidade).filter(Boolean))].sort().forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    elCidade.appendChild(o);
+  });
+
+  // Se existe enhancer de selects, re-run
+  try { enhanceAllSelectsPremium_(); } catch(e){}
+}function popularSubprefeituras() {
+    if (!elSubpref) return;
+    elSubpref.innerHTML = '';
+    const list = [...new Set(estacoes.filter(e => e.cidade === 'São Paulo').map(e => e.subprefeitura).filter(Boolean))].sort();
+    list.forEach(sp => {
+      const o = document.createElement('option');
+      o.value = sp; o.textContent = sp;
+      elSubpref.appendChild(o);
+    });
+  }
+
+  /* ===============================
+     RENDER CORE
+  ================================ */
+  function render(force) {
+    try {
+      if (!map) return;
+      if (!Array.isArray(estacoes) || !estacoes.length) return;
+
+      // ✅ guard: só renderiza depois do bind mínimo do DOM
+      if (!elCidade || !elChkPublica || !elChkPrivada || !elChkConcorrente) return;
+
+      if (!MAP_STATE) { try { initFSM_(); } catch (e) {} }
+      if (!MAP_STATE) return;
+
+      if (!elCidade?.value && (map.getZoom() || 0) <= ZOOM_LIMITE_CIDADE) {
+        if (MAP_STATE.mode !== 'MACRO') MAP_STATE.mode = 'MACRO';
+      }
+
+      const t0 = performance.now();
+      const now = Date.now();
+      const k = renderKey_();
+
+      if (!force && k && k === lastRenderKey_ && (now - lastRenderAt_) < 60) return;
+      if (!force && k && k === lastRenderKey_) return;
+
+      lastRenderKey_ = k;
+      lastRenderAt_ = now;
+
+      if (MAP_STATE.layer === LAYER.JETCROSS) {
+        esconderEstacoesNormais();
+        renderJetCross();
+        atualizarHUD_();
+        const ms = Math.round(performance.now() - t0);
+        window.__LAST_METRICS__ = buildMetrics_({ renderMs: ms });
+        updateDashboardFromState_(MAP_STATE, window.__LAST_METRICS__);
+        return;
+      } else {
+        limparJetCross();
+      }
+
+      if (MAP_STATE.layer === LAYER.DUP) {
+        renderDuplicidades();
+        renderPoligonos();
+        atualizarHUD_();
+        const ms = Math.round(performance.now() - t0);
+        window.__LAST_METRICS__ = buildMetrics_({ renderMs: ms });
+        updateDashboardFromState_(MAP_STATE, window.__LAST_METRICS__);
+        return;
+      }
+
+      if (MAP_STATE.mode === 'MACRO') renderModoCidade();
+      else renderModoEstacoes();
+
+      if (MAP_STATE.polygons && MAP_STATE.canPolygons) renderPoligonos();
+      else renderPoligonos();
+
+      atualizarHUD_();
+
+      try{
+        btnPoligonos?.classList.toggle('on', MAP_STATE.polygons && MAP_STATE.canPolygons);
+        btnPoligonos?.setAttribute('title', MAP_STATE.canPolygons ? '' : 'Polígonos: selecione uma cidade e use zoom ≥ 12');
+      }catch(e){}
+
+      const ms = Math.round(performance.now() - t0);
+      window.__LAST_METRICS__ = buildMetrics_({ renderMs: ms });
+      updateDashboardFromState_(MAP_STATE, window.__LAST_METRICS__);
+
+    } catch (e) {
+      console.error('render() crash:', e);
+    }
+  }
+
+  function esconderEstacoesNormais() {
+    markersCidade.forEach(m => m.setMap(null));
+    markersCidade = [];
+
+    clearClusters_();
+
+    if (elCidade?.value) hideActiveCity_(elCidade.value);
+    hideActiveCity_(null);
+
+    limparViewportCircle();
+    elDashboardDup && (elDashboardDup.style.display = 'none');
+  }
+
+  function renderModoCidade() {
+    clearClusters_();
+    if (elCidade?.value) hideActiveCity_(elCidade.value);
+    hideActiveCity_(null);
+
+    if (elDashboardSP) elDashboardSP.style.display = 'none';
+    if (elDashboardDup) elDashboardDup.style.display = 'none';
+
+    criarMarkersCidade();
+  }
+
+  function iconKeyFor_(e){
+    return `${e.tipo}|${e.statusEstacao}|${(e.modalidade||'').toString().toUpperCase()}`;
+  }
+
+  function markerBudgetForZoom_(z){
+    if (!IS_MOBILE) return 999999;
+    if (z <= 11) return 0;
+    if (z <= 12) return 700;
+    if (z <= 13) return 1200;
+    if (z <= 14) return 2200;
+    return 5200;
+  }
+
+  function distanciaMetros(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  function takeClosestToCenter_(list, budget){
+    if (!list || list.length <= budget) return list;
+    const c = map.getCenter();
+    const clat = c.lat(), clng = c.lng();
+    return list
+      .map(e => ({ e, d: distanciaMetros(clat, clng, e.lat, e.lng) }))
+      .sort((a,b)=>a.d-b.d)
+      .slice(0, budget)
+      .map(x=>x.e);
+  }
+
+  let _LAST_CITYKEY_RENDERED = '__INIT__';
+
+  function renderModoEstacoes() {
+    if (!map) return;
+    const bounds = map.getBounds();
+    if (!bounds) return;
+
+    const z = map.getZoom() || 0;
+    const cidadeKey = elCidade?.value || null;
+
+    const budget = markerBudgetForZoom_(z);
+    if (IS_MOBILE && budget === 0) {
+      clearClusters_();
+      return;
+    }
+
+    const cache = ensureCityCache_(cidadeKey);
+    const t0 = performance.now();
+
+    let visiveis = getVisibleFiltered_(bounds);
+    if (IS_MOBILE && budget > 0 && visiveis.length > budget) {
+      visiveis = takeClosestToCenter_(visiveis, budget);
+    }
+
+    markersCidade.forEach(m => m.setMap(null));
+    markersCidade = [];
+
+    const currKey = (cidadeKey || '__ALL__');
+    if (_LAST_CITYKEY_RENDERED !== currKey) {
+      if (_LAST_CITYKEY_RENDERED === '__ALL__') hideActiveCity_(null);
+      else hideActiveCity_(_LAST_CITYKEY_RENDERED);
+
+      if (cidadeKey) hideActiveCity_(null);
+      else hideActiveCity_(cidadeKey);
+
+      _LAST_CITYKEY_RENDERED = currKey;
+    }
+
+    const nextKeys = new Set();
+    for (let i = 0; i < visiveis.length; i++) nextKeys.add(visiveis[i].__id);
+
+    diffApplyActiveKeys_(cache, nextKeys, { hideCirclesToo: true });
+
+    const iconMemo = new Map();
+    const pubMarkers = [];
+    const priMarkers = [];
+    const conMarkers = [];
+
+    for (let i = 0; i < visiveis.length; i++) {
+      const e = visiveis[i];
+      const m = ensureMarker_(cache, e);
+
+      const ik = iconKeyFor_(e);
+      let iconObj = iconMemo.get(ik);
+      if (!iconObj) {
+        iconObj = icone(e.tipo, e.statusEstacao, e.modalidade);
+        iconMemo.set(ik, iconObj);
+      }
+
+      if (m.__iconKey !== ik) {
+        m.setIcon(iconObj);
+        m.__iconKey = ik;
+      }
+
+      if (m.getMap() !== map) m.setMap(map);
+
+      if (e.tipo === 'PUBLICA') pubMarkers.push(m);
+      else if (e.tipo === 'PRIVADA') priMarkers.push(m);
+      else if (e.tipo === 'CONCORRENTE') conMarkers.push(m);
+    }
+
+    clearClusters_();
+    const wantCluster = !!MAP_STATE?.cluster;
+    if (wantCluster) {
+      clusterPublica = criarCluster(pubMarkers);
+      clusterPrivada = criarCluster(priMarkers);
+      clusterConcorrente = criarCluster(conMarkers);
+    }
+
+    const wantPerStationCircles =
+      !!ALLOW_PER_STATION_CIRCLES &&
+      !!MAP_STATE?.stationRadius &&
+      !MAP_STATE?.radius;
+
+    if (wantPerStationCircles) {
+      let r = Number(elRaioInput?.value || 200);
+      r = Math.max(RAIO_ESTACAO_MIN, Math.min(RAIO_ESTACAO_MAX, r));
+
+      for (let i = 0; i < visiveis.length; i++) {
+        const e = visiveis[i];
+        const c = ensureCircle_(cache, e, r);
+        if (c.__r !== r) { c.setRadius(r); c.__r = r; }
+        if (c.getMap() !== map) c.setMap(map);
+      }
+    } else {
+      if (cache.circleByKey) cache.circleByKey.forEach(c => { if (c) c.setMap(null); });
+    }
+
+    let pubN = 0, priN = 0, conN = 0;
+    let patN = 0, bikeN = 0, hibN = 0;
+
+    for (let i = 0; i < visiveis.length; i++) {
+      const e = visiveis[i];
+      if (e.tipo === 'PUBLICA') pubN++;
+      else if (e.tipo === 'PRIVADA') priN++;
+      else if (e.tipo === 'CONCORRENTE') conN++;
+
+      const mm = (e.modalidade || 'PATINETE').toString().toUpperCase();
+      if (mm === 'BIKE') bikeN++;
+      else if (mm === 'HIBRIDA') hibN++;
+      else patN++;
+    }
+
+    if (elDashTotal) elDashTotal.textContent = `Total: ${visiveis.length}`;
+    if (elDashPublica) elDashPublica.textContent = `Pública: ${pubN}`;
+    if (elDashPrivada) elDashPrivada.textContent = `Privada: ${priN}`;
+    if (elDashConcorrente) elDashConcorrente.textContent = `Concorrente: ${conN}`;
+    if (elDashPatinete) elDashPatinete.textContent = `🛴 ${patN}`;
+    if (elDashBike) elDashBike.textContent = `🚲 ${bikeN}`;
+    if (elDashHibrida) elDashHibrida.textContent = `♦ ${hibN}`;
+    if (elDashRender) elDashRender.textContent = `Render: ${visiveis.length}`;
+
+    const ms = Math.round(performance.now() - t0);
+    window.__LAST_METRICS__ = buildMetrics_({
+      filtroTotal: visiveis.length,
+      filtroPub: pubN,
+      filtroPriv: priN,
+      filtroConc: conN,
+      renderMs: ms
+    });
+
+    try { updateDashboardFromState_(MAP_STATE, window.__LAST_METRICS__); } catch(e){}
+  }
+
+  /* ===============================
+     INFO WINDOW
+  ================================ */
+  function abrirInfo(e, m) {
+    const titulo = (e.codigo || e.nome || e.endereco || 'Estação').toString();
+    const cidade = (e.cidade || '-').toString();
+    const tipo = (e.tipo || '-').toString();
+    const st = (e.statusEstacao || '-').toString();
+
+    const html = `
+      <div class="iwCard">
+        <div class="iwHead">${escapeHtml_(titulo)}</div>
+        <div class="iwBody">
+          <div>${escapeHtml_(e.endereco || '-')}</div>
+          <div class="iwMeta">${escapeHtml_(cidade)}</div>
+          <div style="margin-top:8px">
+            Tipo: <b>${escapeHtml_(tipo)}</b><br/>
+            Status: <b>${escapeHtml_(st)}</b>
+          </div>
+        </div>
+      </div>
+    `;
+    infoWindow.setContent(html);
+    infoWindow.open(map, m);
+  }
+
+  function escapeHtml_(s){
+    return String(s ?? '')
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'","&#39;");
+  }
+
+  /* ===============================
+     DUPLICIDADES
+  ================================ */
+  function renderDuplicidades() {
+    if (IS_MOBILE && MOBILE_CFG.disableDup) { return; }
+    markersCidade.forEach(m => m.setMap(null));
+    markersCidade = [];
+    clearClusters_();
+
+    if (elCidade?.value) hideActiveCity_(elCidade.value);
+    hideActiveCity_(null);
+
+    if (elDashboardSP) elDashboardSP.style.display = 'none';
+
+    const dups = estacoes.filter(e => e.dupGrupo);
+    if (elDashboardDup){
+      elDashboardDup.innerHTML = `<b>🔁 Duplicidades:</b> ${dups.length}`;
+      elDashboardDup.style.display = 'block';
+    }
+  }
+
+  /* ===============================
+     VIEWPORT ANALYSIS (raio central)
+  ================================ */
+  let lastBounds = null;
+
+  function obterBaseFiltradaAtual(bounds) {
+    return getVisibleFiltered_(bounds);
+  }
+
+  function atualizarViewport() {
+    if (!map?.getBounds?.()) return;
+    if (!MAP_STATE) return;
+    if (MAP_STATE.layer !== LAYER.NORMAL) return;
+    if (!estacoes.length) return;
+
+    const bounds = map.getBounds();
+    if (lastBounds && lastBounds.equals(bounds)) return;
+    lastBounds = bounds;
+
+    const centro = map.getCenter();
+    const modoRaio = !!MAP_STATE?.radius;
+    let raio = Number(elRaioInput?.value) || 200;
+
+    if (modoRaio) raio = Math.max(RAIO_ANALISE_MIN, Math.min(RAIO_ANALISE_MAX, raio));
+    else raio = Math.max(RAIO_ESTACAO_MIN, Math.min(RAIO_ESTACAO_MAX, raio));
+
+    elRaioInput.value = raio;
+
+    const baseVisivel = obterBaseFiltradaAtual(bounds);
+
+    if (modoRaio) {
+      const cidadeKey = elCidade.value || null;
+      const circleBounds = boundsFromCircle_(centro.lat(), centro.lng(), raio);
+
+      const baseCidade = elCidade.value ? (estacoesPorCidade[elCidade.value] || []) : estacoes;
+
+      let candidates = baseCidade;
+      const idxs = (circleBounds && baseCidade.length > GRID_PREFILTER_MIN)
+        ? queryGridIdxsByBounds_(cidadeKey, circleBounds, map.getZoom())
+        : null;
+      if (idxs && idxs.length) candidates = idxs.map(i => baseCidade[i]).filter(Boolean);
+
+      const candSet = new Set(candidates);
+      const filtrados = obterBaseFiltradaAtual(circleBounds).filter(e => candSet.has(e));
+
+      viewportEstacoes = filtrados.filter(e => distanciaMetros(centro.lat(), centro.lng(), e.lat, e.lng) <= raio);
+      desenharViewportCircle(centro, raio);
+    } else {
+      limparViewportCircle();
+      viewportEstacoes = baseVisivel.filter(e => bounds.contains(new google.maps.LatLng(e.lat, e.lng)));
+    }
+
+    aplicarAnaliseViewport(raio);
+  }
+
+  function aplicarAnaliseViewport(raio) {
+    if (!viewportEstacoes.length) {
+      if (elDashboardSP) elDashboardSP.style.display = 'none';
+      return;
+    }
+
+    const publica = viewportEstacoes.filter(e => e.tipo === 'PUBLICA').length;
+    const privada = viewportEstacoes.filter(e => e.tipo === 'PRIVADA').length;
+    const concorrente = viewportEstacoes.filter(e => e.tipo === 'CONCORRENTE').length;
+
+    const modoRaio = !!MAP_STATE?.radius;
+
+    const html = `
+      <b>📍 Análise ${modoRaio ? 'por Raio (' + raio + 'm)' : 'da Área Visível'}</b><br>
+      Pública: ${publica} |
+      Privada: ${privada} |
+      Concorrente: ${concorrente} |
+      Total: ${viewportEstacoes.length}
+    `;
+    if (elDashboardSP){
+      elDashboardSP.innerHTML = html;
+      elDashboardSP.style.display = 'block';
+    }
+  }
+
+  function desenharViewportCircle(centro, raio) {
+    limparViewportCircle();
+    viewportCircle = new google.maps.Circle({
+      map,
+      center: centro,
+      radius: raio,
+      fillColor: '#2563eb',
+      fillOpacity: 0.12,
+      strokeColor: '#1e40af',
+      strokeOpacity: 0.7,
+      strokeWeight: 1
+    });
+  }
+
+  function limparViewportCircle() {
+    if (viewportCircle) {
+      viewportCircle.setMap(null);
+      viewportCircle = null;
+    }
+  }
+
+  /* ===============================
+     MODO CIDADE
+  ================================ */
+  function agruparEstacoesPorCidade() {
+    estacoesPorCidade = {};
+    estacoes.forEach(e => {
+      if (!e.cidade) return;
+      if (!estacoesPorCidade[e.cidade]) estacoesPorCidade[e.cidade] = [];
+      estacoesPorCidade[e.cidade].push(e);
+    });
+  }
+
+  function calcularCentroCidade(lista) {
+    let lat = 0, lng = 0, n = 0;
+    lista.forEach(e => {
+      const la = parseCoord_(e?.lat);
+      const ln = parseCoord_(e?.lng);
+      if (la == null || ln == null) return;
+      lat += la; lng += ln; n++;
+    });
+    if (!n) return null;
+    return { lat: lat / n, lng: lng / n };
+  }
+
+  const SHOW_CITY_COUNT = false;
+
+  function calcularBreakdownCidade(lista){
+    let pub=0, pri=0, con=0, pat=0, bike=0, hib=0;
+    for (const e of (lista||[])){
+      if (e.tipo === 'PUBLICA') pub++;
+      else if (e.tipo === 'PRIVADA') pri++;
+      else if (e.tipo === 'CONCORRENTE') con++;
+
+      const m = (e.modalidade || 'PATINETE').toString().toUpperCase();
+      if (m === 'BIKE') bike++;
+      else if (m === 'HIBRIDA') hib++;
+      else pat++;
+    }
+    return { total:(lista||[]).length, pub, pri, con, pat, bike, hib };
+  }
+
+  function htmlTooltipCidade(cidade, b){
+    const c = escapeHtml_(cidade || '-');
+    return `
+      <div class="iwCard">
+        <div class="iwHead">${c}</div>
+        <div class="iwBody">
+          <div><b>Total:</b> ${b.total}</div>
+          <div style="margin-top:6px">
+            Pública: <b>${b.pub}</b> · Privada: <b>${b.pri}</b> · Concorrente: <b>${b.con}</b>
+          </div>
+          <div class="iwMeta" style="margin-top:6px">
+            🛴 ${b.pat} · 🚲 ${b.bike} · ♦ ${b.hib}
+          </div>
+          <div style="margin-top:8px; opacity:.85">Clique para entrar na cidade</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function criarMarkersCidade() {
+    if (elCidade?.value) hideActiveCity_(elCidade.value);
+    hideActiveCity_(null);
+
+    clearClusters_();
+
+    markersCidade.forEach(m => m.setMap(null));
+    markersCidade = [];
+
+    Object.keys(estacoesPorCidade).forEach(cidade => {
+      const lista = estacoesPorCidade[cidade];
+      if (!lista || !lista.length) return;
+
+      const centro = calcularCentroCidade(lista);
+      if (!centro) return;
+
+      const labelTxt = SHOW_CITY_COUNT ? `${cidade} · ${lista.length}` : `${cidade}`;
+
+      const marker = new google.maps.Marker({
+        position: centro,
+        map,
+        label: {
+          text: labelTxt,
+          fontSize: "12px",
+          fontWeight: "bold",
+          color: "#111827"
+        },
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 6,
+          fillColor: "#2563eb",
+          fillOpacity: 0.9,
+          strokeWeight: 0
+        }
+      });
+
+      marker.addListener('mouseover', () => {
+        const breakdown = calcularBreakdownCidade(lista);
+        infoWindow.setContent(htmlTooltipCidade(cidade, breakdown));
+        infoWindow.open(map, marker);
+      });
+      marker.addListener('mouseout', () => infoWindow.close());
+
+      marker.addListener('click', () => {
+        entrouPorCidade = true;
+        elCidade.value = cidade;
+        fitBoundsCidade(lista);
+        safeRenderRequest_(true);
+      });
+
+      markersCidade.push(marker);
+    });
+  }
+
+  function fitBoundsCidade(lista) {
+    if (!lista || !lista.length) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    let n = 0;
+
+    lista.forEach(e => {
+      const la = parseCoord_(e?.lat);
+      const ln = parseCoord_(e?.lng);
+      if (la == null || ln == null) return;
+      bounds.extend({ lat: la, lng: ln });
+      n++;
+    });
+
+    if (!n) return;
+
+    map.fitBounds(bounds);
+
+    setTimeout(() => {
+      const z = map.getZoom();
+      if (z != null && z < 12) map.setZoom(12);
+    }, 120);
+  }
+
+  /* ===============================
+     POLÍGONOS (mantido)
+  ================================ */
+  const ZOOM_POLY_MIN = 12;
+  let polyLazyTimer = null;
+  let polyLazyLastCity = null;
+
+  function colorFromGroupFase_(grupo, fase){
+    const s = `${grupo || ''}::${fase || ''}`;
+    let h = 0;
+    for (let i=0;i<s.length;i++) h = ((h<<5)-h) + s.charCodeAt(i), h |= 0;
+    h = Math.abs(h);
+
+    const palette = ['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#22c55e','#fb7185','#38bdf8'];
+    return palette[h % palette.length];
+  }
+
+  function normalizePolyMeta_(p, cidade) {
+    const grupo = (p.grupo || p.group || 'Geral').toString();
+    const fase  = (p.fase  || p.phase || 'Fase 1').toString();
+    const ativo = (typeof p.ativo === 'boolean') ? p.ativo : ((typeof p.active === 'boolean') ? p.active : true);
+    const prioridade = Number(p.prioridade ?? p.priority ?? 1) || 1;
+    const nome = (p.nome || p.name || 'Area').toString();
+
+    const id =
+      (p.id || '').toString().trim() ||
+      `${cidade}__${grupo}__${fase}__${nome}__${Math.random().toString(16).slice(2)}`;
+
+    const rawPath = p.poligono || p.path || [];
+    const poligono = (Array.isArray(rawPath) ? rawPath : [])
+      .map(pt => {
+        const lat = Number(pt?.lat ?? pt?.latitude ?? pt?.[0]);
+        const lng = Number(pt?.lng ?? pt?.lon ?? pt?.longitude ?? pt?.[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+        return { lat, lng };
+      })
+      .filter(Boolean);
+
+    const cor = (p.cor || p.color || '').toString().trim() || colorFromGroupFase_(grupo, fase);
+
+    return { id, cidade, grupo, fase, ativo, prioridade, cor, poligono, __rawPath: poligono };
+  }
+
+  function simplifyPathDP_(points, tolerance){
+    if (!Array.isArray(points) || points.length < 6) return points || [];
+    const tol = Number(tolerance || 0);
+    if (!tol) return points;
+
+    function sqSegDist(p,a,b){
+      let x = a.lng, y = a.lat;
+      let dx = b.lng - x, dy = b.lat - y;
+
+      if (dx !== 0 || dy !== 0) {
+        const t = ((p.lng - x)*dx + (p.lat - y)*dy) / (dx*dx + dy*dy);
+        if (t > 1) { x = b.lng; y = b.lat; }
+        else if (t > 0) { x += dx*t; y += dy*t; }
+      }
+      dx = p.lng - x; dy = p.lat - y;
+      return dx*dx + dy*dy;
+    }
+
+    function dp(points, first, last, sqTol, simplified){
+      let maxSqDist = sqTol, index = -1;
+      for (let i = first+1; i < last; i++){
+        const d = sqSegDist(points[i], points[first], points[last]);
+        if (d > maxSqDist) { index = i; maxSqDist = d; }
+      }
+      if (index !== -1){
+        if (index - first > 1) dp(points, first, index, sqTol, simplified);
+        simplified.push(points[index]);
+        if (last - index > 1) dp(points, index, last, sqTol, simplified);
+      }
+    }
+
+    const sqTol = tol*tol;
+    const simplified = [points[0]];
+    dp(points, 0, points.length-1, sqTol, simplified);
+    simplified.push(points[points.length-1]);
+    return simplified;
+  }
+
+  function polyToleranceForZoom_(z){
+    if (z <= 12) return 0.0012;
+    if (z <= 13) return 0.0008;
+    if (z <= 14) return 0.0005;
+    return 0;
+  }
+
+  function carregarPoligonosCidade_(cidade, cb) {
+    if (!cidade) { cb([]); return; }
+
+    const cache = ensureCityCache_(cidade);
+    if (cache.polygonsLoaded) {
+      cb(cache.polygonsMeta);
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(lista) {
+        const arr = Array.isArray(lista) ? lista : [];
+        cache.polygonsMeta = arr.map(p => normalizePolyMeta_(p, cidade));
+        cache.polygonsLoaded = true;
+
+        cache.polygonsMeta.forEach(meta => {
+          const poly = ensurePolygonInstance_(cache, meta);
+          poly.__meta = meta;
+          applyPolygonStyle_(poly, meta);
+        });
+
+        atualizarUIGruposPoligonos_(cidade);
+        cb(cache.polygonsMeta);
+      })
+      .withFailureHandler(function(err) {
+        console.error('getPoligonosCidade erro:', err);
+        cache.polygonsMeta = [];
+        cache.polygonsLoaded = true;
+        atualizarUIGruposPoligonos_(cidade);
+        cb([]);
+      })
+      .getPoligonosCidade(cidade);
+  }
+
+  function fasesSelecionadas_() {
+    const checks = [...document.querySelectorAll('.chkFase')];
+    const set = new Set();
+    checks.forEach(ch => { if (ch.checked) set.add(ch.dataset.fase); });
+    return set;
+  }
+
+  function gruposSelecionados_() {
+    if (!elGrupoPoly) return new Set();
+    const opts = [...elGrupoPoly.selectedOptions].map(o => o.value).filter(Boolean);
+    return new Set(opts);
+  }
+
+  function atualizarUIGruposPoligonos_(cidade) {
+    const temCidade = !!cidade;
+    if (elChipGrupo) elChipGrupo.style.display = temCidade ? 'inline-flex' : 'none';
+    if (elChipFases) elChipFases.style.display = temCidade ? 'inline-flex' : 'none';
+    if (elChipSomenteAtivos) elChipSomenteAtivos.style.display = temCidade ? 'inline-flex' : 'none';
+
+    if (!elGrupoPoly) return;
+    elGrupoPoly.innerHTML = '';
+    if (!temCidade) return;
+
+    const cache = ensureCityCache_(cidade);
+    const grupos = [...new Set((cache.polygonsMeta || []).map(p => p.grupo))].sort();
+
+    grupos.forEach(g => {
+      const o = document.createElement('option');
+      o.value = g;
+      o.textContent = g;
+      o.selected = true;
+      elGrupoPoly.appendChild(o);
+    });
+  }
+
+  function ensurePolygonInstance_(cache, p) {
+    let poly = cache.polygonsById.get(p.id);
+    if (poly) return poly;
+
+    poly = new google.maps.Polygon({
+      paths: p.poligono,
+      strokeColor: p.cor,
+      strokeOpacity: 0.9,
+      strokeWeight: 2,
+      fillColor: p.cor,
+      fillOpacity: 0.18,
+      zIndex: 100,
+      map: null
+    });
+
+    poly.__meta = p;
+    cache.polygonsById.set(p.id, poly);
+    return poly;
+  }
+
+  function applyPolygonStyle_(poly, p) {
+    const z = map?.getZoom?.() || 12;
+    const tol = polyToleranceForZoom_(z);
+
+    let path = p.poligono || [];
+    if (tol && p.__rawPath && Array.isArray(p.__rawPath)) {
+      const key = String(z);
+      if (!p.__simpByZoom) p.__simpByZoom = {};
+      if (!p.__simpByZoom[key]) p.__simpByZoom[key] = simplifyPathDP_(p.__rawPath, tol);
+      path = p.__simpByZoom[key];
+    } else if (p.__rawPath) {
+      path = p.__rawPath;
+    }
+
+    const zIndex = 100 + (p.prioridade * 10);
+    poly.setOptions({ paths: path, strokeColor: p.cor, fillColor: p.cor, fillOpacity: 0.18, zIndex });
+  }
+
+  function hideAllPolygonsCity_(cidade) {
+    if (!cidade) return;
+    const cache = ensureCityCache_(cidade);
+    cache.polygonsById.forEach(poly => poly.setMap(null));
+    cache.polygonsVisibleIds.clear();
+  }
+
+  function renderPoligonos() {
+    const cidade = elCidade?.value || '';
+    const zoomOk = map && (map.getZoom() >= ZOOM_POLY_MIN);
+
+    if (!MAP_STATE || !(MAP_STATE.polygons && MAP_STATE.canPolygons) || !cidade || !zoomOk) {
+      if (cidade) hideAllPolygonsCity_(cidade);
+      if (polyLazyTimer) { clearTimeout(polyLazyTimer); polyLazyTimer = null; }
+      return;
+    }
+    if (polyLazyTimer) clearTimeout(polyLazyTimer);
+
+    polyLazyTimer = setTimeout(() => {
+      polyLazyTimer = null;
+
+      if (!MAP_STATE || !(MAP_STATE.polygons && MAP_STATE.canPolygons)) return;
+      if (!elCidade.value || elCidade.value !== cidade) return;
+      if (map.getZoom() < ZOOM_POLY_MIN) return;
+
+      if (polyLazyLastCity && polyLazyLastCity !== cidade) hideAllPolygonsCity_(polyLazyLastCity);
+      polyLazyLastCity = cidade;
+
+      carregarPoligonosCidade_(cidade, function(meta) {
+        if (!elChkPoligonos?.checked) return;
+        if (elCidade.value !== cidade) return;
+        if (map.getZoom() < ZOOM_POLY_MIN) return;
+
+        const cache = ensureCityCache_(cidade);
+
+        const fasesSet = fasesSelecionadas_();
+        const gruposSet = gruposSelecionados_();
+        const somenteAtivos = !!elChkPolySomenteAtivos?.checked;
+        const aplicarFiltroGrupo = gruposSet.size > 0;
+
+        const nextVisible = new Set();
+
+        (meta || []).forEach(p => {
+          if (somenteAtivos && !p.ativo) return;
+          if (fasesSet.size && !fasesSet.has(p.fase)) return;
+          if (aplicarFiltroGrupo && !gruposSet.has(p.grupo)) return;
+
+          nextVisible.add(p.id);
+
+          const poly = ensurePolygonInstance_(cache, p);
+          poly.__meta = p;
+          applyPolygonStyle_(poly, p);
+
+          if (poly.getMap() !== map) poly.setMap(map);
+        });
+
+        cache.polygonsVisibleIds.forEach(id => {
+          if (!nextVisible.has(id)) {
+            const poly = cache.polygonsById.get(id);
+            if (poly) poly.setMap(null);
+          }
+        });
+
+        cache.polygonsVisibleIds = nextVisible;
+      });
+
+    }, 180);
+  }
+
+  /* ===============================
+     HUD + METRICS
+  ================================ */
+  function atualizarHUD_(){
+    if (!hudTotal) return;
+
+    hudTotal.textContent = elDashTotal?.textContent || 'Total: 0';
+    hudRender.textContent = elDashRender?.textContent || 'Render: 0';
+    hudPub.textContent = elDashPublica?.textContent || 'Pública: 0';
+    hudPri.textContent = elDashPrivada?.textContent || 'Privada: 0';
+    hudCon.textContent = elDashConcorrente?.textContent || 'Concorrente: 0';
+
+    if (hudRaio) hudRaio.style.display = (!!MAP_STATE?.radius) ? 'block' : 'none';
+    if (hudRaioVal) hudRaioVal.textContent = `${Number(elRaioInput?.value)||200}m`;
+
+    if (lblPoli) lblPoli.textContent = elChkPoligonos?.checked ? 'ON' : 'OFF';
+    if (lblRaio) lblRaio.textContent = (MAP_STATE?.radius ? 'ON' : 'OFF');
+  }
+
+  function numFromSpan_(txt){
+    const n = String(txt||'').split(':').pop().trim().replace(/\./g,'');
+    const v = Number(n);
+    return Number.isFinite(v) ? v : 0;
+  }
+
+  function buildMetrics_(extra = {}) {
+    const fallbackFiltroTotal = numFromSpan_(elDashRender?.textContent || 'Render: 0');
+    const fallbackPub   = numFromSpan_(elDashPublica?.textContent || 'Pública: 0');
+    const fallbackPriv  = numFromSpan_(elDashPrivada?.textContent || 'Privada: 0');
+    const fallbackConc  = numFromSpan_(elDashConcorrente?.textContent || 'Concorrente: 0');
+
+    const vis = Array.isArray(viewportEstacoes) ? viewportEstacoes.length : 0;
+
+    return {
+      filtroTotal: extra.filtroTotal ?? fallbackFiltroTotal,
+      filtroPub:   extra.filtroPub   ?? fallbackPub,
+      filtroPriv:  extra.filtroPriv  ?? fallbackPriv,
+      filtroConc:  extra.filtroConc  ?? fallbackConc,
+      visivelTotal: vis,
+      raioTotal: (MAP_STATE && MAP_STATE.radius) ? vis : 0,
+      renderMs: extra.renderMs ?? 0,
+      lastKey: lastRenderKey_
+    };
+  }
+
+  /* ===============================
+     MOBILE Bottom-sheet
+  ================================ */
+  function setupBottomSheetMobile_(){
+    if (!IS_MOBILE) return;
+    if (!sidebarEl) return;
+
+    const handle = document.getElementById('sheetHandle');
+    const header = document.getElementById('sidebarHeader');
+
+    const H_COLLAPSED = 76;
+    const H_MID = Math.round(window.innerHeight * 0.48);
+    const H_EXPANDED = Math.round(window.innerHeight * 0.88);
+
+    let sheetH = H_MID;
+    let dragging = false;
+    let startY = 0;
+    let startH = 0;
+
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    function apply(h, snap=true){
+      sheetH = clamp(h, H_COLLAPSED, H_EXPANDED);
+
+      document.documentElement.style.setProperty('--sheet-h', sheetH + 'px');
+      sidebarEl.classList.toggle('is-collapsed', sheetH <= H_COLLAPSED + 2);
+
+      if (btnCollapse) btnCollapse.textContent = (sheetH <= H_COLLAPSED + 2) ? '⟨' : '⟩';
+      if (snap) triggerMapResizeDebounced_();
+    }
+
+    function nearestSnap(h){
+      const snaps = [H_COLLAPSED, H_MID, H_EXPANDED];
+      let best = snaps[0], bestD = Math.abs(h - snaps[0]);
+      for (let i=1;i<snaps.length;i++){
+        const d = Math.abs(h - snaps[i]);
+        if (d < bestD){ best = snaps[i]; bestD = d; }
+      }
+      return best;
+    }
+
+    function onDown(ev){
+      const e = ev.touches ? ev.touches[0] : ev;
+      dragging = true;
+      startY = e.clientY;
+      startH = clamp(sheetH, H_COLLAPSED, H_EXPANDED);
+      sidebarEl.style.transition = 'none';
+      document.body.style.userSelect = 'none';
+    }
+
+    function onMove(ev){
+      if (!dragging) return;
+      const e = ev.touches ? ev.touches[0] : ev;
+      const dy = startY - e.clientY;
+      apply(startH + dy, false);
+      ev.preventDefault?.();
+    }
+
+    function onUp(){
+      if (!dragging) return;
+      dragging = false;
+      sidebarEl.style.transition = '';
+      document.body.style.userSelect = '';
+      apply(nearestSnap(sheetH), true);
+    }
+
+    const dragArea = handle || header;
+    if (dragArea){
+      dragArea.style.touchAction = 'none';
+      dragArea.addEventListener('touchstart', onDown, { passive:false });
+      dragArea.addEventListener('touchmove', onMove, { passive:false });
+      dragArea.addEventListener('touchend', onUp, { passive:true });
+
+      dragArea.addEventListener('mousedown', onDown);
+      window.addEventListener('mousemove', onMove, { passive:false });
+      window.addEventListener('mouseup', onUp);
+    }
+
+    if (btnCollapse){
+      btnCollapse.addEventListener('click', () => {
+        const isCollapsed = sheetH <= H_COLLAPSED + 2;
+        apply(isCollapsed ? H_MID : H_COLLAPSED, true);
+      });
+    }
+
+    window.addEventListener('resize', () => apply(nearestSnap(sheetH), true));
+    apply(H_MID, true);
+  }
+
+  /* ===============================
+     LISTENERS + PREMIUM UI WIRING
+  ================================ */
+  let btnMinhaLocal, btnSeguirLocal, lblSeguirLocal;
+
+  window.addEventListener('DOMContentLoaded', function() {
+    sidebarEl = document.getElementById('sidebar');
+    btnCollapse = document.getElementById('btnCollapse');
+
+    btnCentralizar = document.getElementById('btnCentralizar');
+    btnRecarregar  = document.getElementById('btnRecarregar');
+
+    btnMinhaLocal  = document.getElementById('btnMinhaLocal');
+    btnSeguirLocal = document.getElementById('btnSeguirLocal');
+    lblSeguirLocal = document.getElementById('lblSeguirLocal');
+
+    btnPoligonos = document.getElementById('btnPoligonos');
+    btnRaio      = document.getElementById('btnRaio');
+    btnCluster   = document.getElementById('btnCluster');
+
+    lblPoli    = document.getElementById('lblPoli');
+    lblRaio    = document.getElementById('lblRaio');
+    lblCluster = document.getElementById('lblCluster');
+
+    lblBaseCount = document.getElementById('lblBaseCount');
+
+    bindDash_();
+    try { initEnterpriseDash_(); } catch(e) {}
+
+    elCidade = document.getElementById('cidadeFilter');
+    elSubpref = document.getElementById('subprefFilter');
+
+    elChkPublica = document.getElementById('chkPublica');
+    elChkPrivada = document.getElementById('chkPrivada');
+    elChkConcorrente = document.getElementById('chkConcorrente');
+
+    elChkPatinete = document.getElementById('chkPatinete');
+    elChkBike = document.getElementById('chkBike');
+    elChkHibrida = document.getElementById('chkHibrida');
+
+    elDashPatinete = document.getElementById('dashPatinete');
+    elDashBike = document.getElementById('dashBike');
+    elDashHibrida = document.getElementById('dashHibrida');
+
+    elChkAtivo = document.getElementById('chkAtivo');
+    elChkSolicitado = document.getElementById('chkSolicitado');
+    elChkCancelado = document.getElementById('chkCancelado');
+
+    elChkRaio = document.getElementById('chkRaio');
+    elRaioInput = document.getElementById('raioInput');
+
+    elChkDuplicidades = document.getElementById('chkDuplicidades');
+    elChkJetCross = document.getElementById('chkJetCross');
+
+    elDashTotal = document.getElementById('dashTotal');
+    elDashPublica = document.getElementById('dashPublica');
+    elDashPrivada = document.getElementById('dashPrivada');
+    elDashConcorrente = document.getElementById('dashConcorrente');
+    elDashRender = document.getElementById('dashRender');
+
+    elDashboardSP = document.getElementById('dashboardSP');
+    elDashboardDup = document.getElementById('dashboardDup');
+
+    elLegendaJetCross = document.getElementById('legendaJetCross');
+
+    elChkPoligonos = document.getElementById('chkPoligonos');
+    elGrupoPoly = document.getElementById('grupoPoligonoFilter');
+    elChipGrupo = document.getElementById('chipGrupo');
+    elChipFases = document.getElementById('chipFases');
+    elChipSomenteAtivos = document.getElementById('chipSomenteAtivos');
+    elChkPolySomenteAtivos = document.getElementById('chkPoligonoSomenteAtivos');
+
+    hudTotal = document.getElementById('hudTotal');
+    hudRender = document.getElementById('hudRender');
+    hudPub = document.getElementById('hudPub');
+    hudPri = document.getElementById('hudPri');
+    hudCon = document.getElementById('hudCon');
+    hudRaio = document.getElementById('hudRaio');
+    hudRaioVal = document.getElementById('hudRaioVal');
+
+    elSearchInput = document.getElementById('searchInput');
+    if (elSearchInput) {
+      elSearchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer_);
+        searchTimer_ = setTimeout(() => {
+          SEARCH_Q = (elSearchInput.value || '').toString().trim().toLowerCase();
+          dispatch_('FILTER_CHANGED');
+        }, 90);
+      });
+    }
+
+    if (btnMinhaLocal) {
+      btnMinhaLocal.addEventListener('click', () => { centerToMyLocationOnce_(); startGeoWatch_(); });
+    }
+
+    if (btnSeguirLocal) {
+      btnSeguirLocal.addEventListener('click', () => {
+        geoFollow = !geoFollow;
+        if (lblSeguirLocal) lblSeguirLocal.textContent = geoFollow ? 'ON' : 'OFF';
+        btnSeguirLocal.classList.toggle('on', geoFollow);
+        if (geoFollow) startGeoWatch_();
+      });
+    }
+
+    const btnBikeLayer = document.getElementById('btnBikeLayer');
+    const lblBikeLayer = document.getElementById('lblBikeLayer');
+
+    var _cicloPolylines  = [];
+    var _cicloCarregadas = false;
+    var _cicloCarregando = false;
+ 
+    function setBikeLayer_(on) {
+      bikeLayerOn = !!on;
+      if (lblBikeLayer) lblBikeLayer.textContent = bikeLayerOn ? 'ON' : 'OFF';
+      if (btnBikeLayer) btnBikeLayer.classList.toggle('on', bikeLayerOn);
+ 
+      if (!bikeLayerOn) {
+        _cicloPolylines.forEach(function(p){ p.setMap(null); });
+        if (bikeLayer) bikeLayer.setMap(null);
+        return;
+      }
+ 
+      if (_cicloCarregadas && _cicloPolylines.length > 0) {
+        _cicloPolylines.forEach(function(p){ p.setMap(map); });
+        return;
+      }
+ 
+      if (_cicloCarregando) return;
+      _cicloCarregando = true;
+ 
+      var cidade = elCidade ? (elCidade.value || '') : '';
+ 
+      google.script.run
+        .withSuccessHandler(function(pipes) {
+          _cicloCarregando = false;
+          _cicloCarregadas = true;
+ 
+          if (!pipes || !pipes.length) {
+            if (!bikeLayer) bikeLayer = new google.maps.BicyclingLayer();
+            if (bikeLayerOn) bikeLayer.setMap(map);
+            return;
+          }
+ 
+          _cicloPolylines = [];
+          pipes.forEach(function(pipe) {
+            if (!pipe) return;
+            var pts = pipe.split('|').map(function(pt) {
+              var p = pt.split(',');
+              var lat = parseFloat(p[0]), lng = parseFloat(p[1]);
+              return (isNaN(lat)||isNaN(lng)) ? null : {lat:lat, lng:lng};
+            }).filter(Boolean);
+            if (pts.length < 2) return;
+            _cicloPolylines.push(new google.maps.Polyline({
+              path: pts, geodesic: true,
+              strokeColor: '#22c55e', strokeOpacity: 0.85, strokeWeight: 3,
+              map: bikeLayerOn ? map : null, zIndex: 10
+            }));
+          });
+ 
+          if (lblBikeLayer) lblBikeLayer.textContent = bikeLayerOn
+            ? 'ON (' + _cicloPolylines.length + ')'
+            : 'OFF';
+        })
+        .withFailureHandler(function() {
+          _cicloCarregando = false;
+          if (!bikeLayer) bikeLayer = new google.maps.BicyclingLayer();
+          if (bikeLayerOn) bikeLayer.setMap(map);
+        })
+        .getCicloviasCidade(cidade);
+    }
+
+    if (btnBikeLayer){
+      btnBikeLayer.addEventListener('click', () => {
+        if (!map || !google?.maps?.BicyclingLayer) return;
+        setBikeLayer_(!bikeLayerOn);
+      });
+    }
+
+    const btnRaioCentro = document.getElementById('btnRaioCentro');
+    const lblRaioEst = document.getElementById('lblRaioEst');
+
+    if (btnRaioCentro) btnRaioCentro.addEventListener('click', () => {
+      if (!MAP_STATE) return;
+      if (IS_MOBILE) return;
+      if (MAP_STATE.layer !== LAYER.NORMAL) return;
+      dispatch_('TOGGLE_STATION_RADIUS');
+      if (lblRaioEst) lblRaioEst.textContent = (MAP_STATE?.stationRadius ? 'ON' : 'OFF');
+    });
+
+    if (btnCollapse && sidebarEl && !IS_MOBILE) {
+      btnCollapse.addEventListener('click', () => {
+        const col = sidebarEl.classList.toggle('collapsed');
+        btnCollapse.textContent = col ? '⟩⟩' : '⟨⟨';
+        triggerMapResizeDebounced_();
+      });
+    }
+
+    if (btnPoligonos) btnPoligonos.addEventListener('click', () => {
+      if (!MAP_STATE) return;
+      if (!MAP_STATE.canPolygons && !MAP_STATE.polygons) return;
+      dispatch_('TOGGLE_POLYGONS');
+    });
+
+    if (btnRaio) btnRaio.addEventListener('click', () => {
+      if (!MAP_STATE) return;
+      if (MAP_STATE.layer !== LAYER.NORMAL) return;
+      dispatch_('TOGGLE_RADIUS');
+    });
+
+    if (btnCluster) btnCluster.addEventListener('click', () => {
+      if (!MAP_STATE) return;
+      dispatch_('TOGGLE_CLUSTER');
+    });
+
+    if (btnCentralizar) btnCentralizar.addEventListener('click', () => {
+      if (!map) return;
+      if (elCidade?.value && estacoesPorCidade[elCidade.value]?.length) {
+        fitBoundsCidade(estacoesPorCidade[elCidade.value]);
+      } else {
+        map.setCenter({ lat: -14.235, lng: -51.925 });
+        map.setZoom(5);
+      }
+      safeRenderRequest_(true);
+    });
+
+    if (btnRecarregar) btnRecarregar.addEventListener('click', () => {
+      hardResetLayers_();
+      google.script.run
+        .withSuccessHandler(onData)
+        .withFailureHandler(err => console.error('getEstacoesWebApp erro:', err))
+        .getEstacoesWebApp();
+    });
+
+    [
+      elChkPublica, elChkPrivada, elChkConcorrente,
+      elChkPatinete, elChkBike, elChkHibrida,
+      elChkAtivo, elChkSolicitado, elChkCancelado
+    ].filter(Boolean).forEach(el => el.addEventListener('change', () => dispatch_('FILTER_CHANGED')));
+
+    elCidade?.addEventListener('change', async function() {
+      limparViewportCircle();
+      entrouPorCidade = false;
+
+      atualizarUIGruposPoligonos_(elCidade.value);
+
+      if (elCidade.value) {
+        // Mobile lazy: load stations for selected city if backend supports it
+        if (IS_MOBILE && MOBILE_CFG.cityLazyLoad) {
+          const ok = await ensureCityLoadedMobile_(elCidade.value);
+          if (ok && Array.isArray(estacoes) && estacoes.length) {
+            entrouPorCidade = true;
+            try { fitBoundsCidade(estacoes); } catch(e){}
+          }
+        } else {
+          const lista = estacoesPorCidade[elCidade.value];
+          if (lista && lista.length) {
+            entrouPorCidade = true;
+            fitBoundsCidade(lista);
+          }
+        }
+      }
+
+      limparJetCross();
+
+      jetCrossFitAplicado = false;
+      if (elLegendaJetCross) elLegendaJetCross.style.display = 'none';
+
+      dispatch_('CITY_CHANGED', { city: elCidade.value || '' });
+    });
+
+    elSubpref?.addEventListener('change', () => dispatch_('FILTER_CHANGED'));
+
+    elRaioInput?.addEventListener('change', function() {
+      let v = Number(this.value) || 200;
+      if (MAP_STATE?.radius) v = Math.max(RAIO_ANALISE_MIN, Math.min(RAIO_ANALISE_MAX, v));
+      else v = Math.max(RAIO_ESTACAO_MIN, Math.min(RAIO_ESTACAO_MAX, v));
+      this.value = v;
+      dispatch_('FILTER_CHANGED');
+    });
+
+    elChkJetCross?.addEventListener('change', function() {
+      if (this.checked) {
+        hardResetLayers_();
+        jetCrossFitAplicado = false;
+        dispatch_('TOGGLE_LAYER', { layer: LAYER.JETCROSS });
+      } else {
+        hardResetLayers_();
+        limparJetCross();
+        jetCrossFitAplicado = false;
+        dispatch_('TOGGLE_LAYER', { layer: LAYER.NORMAL });
+      }
+    });
+
+    elChkDuplicidades?.addEventListener('change', function() {
+      hardResetLayers_();
+      dispatch_('TOGGLE_LAYER', { layer: this.checked ? LAYER.DUP : LAYER.NORMAL });
+    });
+
+    elChkPoligonos?.addEventListener('change', () => dispatch_('TOGGLE_POLYGONS'));
+    elGrupoPoly?.addEventListener('change', () => dispatch_('FILTER_CHANGED'));
+    elChkPolySomenteAtivos?.addEventListener('change', () => dispatch_('FILTER_CHANGED'));
+    [...document.querySelectorAll('.chkFase')].filter(Boolean)
+      .forEach(ch => ch.addEventListener('change', () => dispatch_('FILTER_CHANGED')));
+
+    try { if (!MAP_STATE) initFSM_(); } catch(e) { console.error('initFSM fail', e); }
+    try { setupBottomSheetMobile_(); } catch(e) { console.error('sheet fail', e); }
+
+    // se já tiver data carregada, força render seguro
+    safeRenderRequest_(true);
+  });
+
+  window.initMap = initMap;
+  </script>
+
+  <script
+    src="https://maps.googleapis.com/maps/api/js?key=<?= GMAPS_API_KEY ?>&callback=initMap&libraries=geometry,places"
+    async defer></script>
+
+  <script>
+/* ===================== PREMIUM UX PACK (JS) ===================== */
+
+function enhanceAllSelectsPremium_(){
+  const selects = Array.from(document.querySelectorAll('select'))
+    .filter(sel => !sel.dataset.pxEnhanced);
+
+  selects.forEach(sel => {
+    sel.dataset.pxEnhanced = '1';
+
+    const isMulti = sel.multiple || sel.size > 1;
+    // Hide native select completely so it can NEVER open the white dropdown
+    sel.style.display = 'none';
+    sel.style.position = 'absolute';
+    sel.style.left = '-99999px';
+    sel.style.pointerEvents = 'none';
+
+    // If already has a custom UI sibling, don't duplicate
+    const existing = sel.parentElement?.querySelector(`.pxSelectWrap[data-for="${CSS.escape(sel.id || sel.name || '')}"]`);
+    if (existing) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pxSelectWrap';
+    wrap.dataset.for = (sel.id || sel.name || '');
+    // Ensure wrap takes full width like the select did
+    wrap.style.width = '100%';
+
+    const btn = document.createElement('div');
+    btn.className = 'pxSelect';
+    btn.tabIndex = 0;
+
+    const label = document.createElement('div');
+    label.className = 'pxLabel';
+
+    const chev = document.createElement('div');
+    chev.className = 'pxChevron';
+
+    btn.appendChild(label);
+    btn.appendChild(chev);
+
+    const menu = document.createElement('div');
+    menu.className = 'pxMenu';
+    const list = document.createElement('div');
+    list.className = 'pxMenuList';
+    menu.appendChild(list);
+
+    function close(){ menu.classList.remove('open'); }
+    function open(){
+      document.querySelectorAll('.pxMenu.open').forEach(m => m.classList.remove('open'));
+      menu.classList.add('open');
+    }
+    function toggle(){ menu.classList.contains('open') ? close() : open(); }
+
+    function getSelectedTexts(){
+      const opts = Array.from(sel.options).filter(o => o.selected);
+      return opts.map(o => o.textContent || o.value);
+    }
+
+    function syncLabel(){
+      if (!isMulti){
+        const opt = sel.options[sel.selectedIndex];
+        label.textContent = opt ? (opt.textContent || opt.value) : 'Selecione';
+      } else {
+        const texts = getSelectedTexts();
+        if (!texts.length) label.textContent = 'Selecionar…';
+        else if (texts.length === 1) label.textContent = texts[0];
+        else label.textContent = `${texts.length} selecionados`;
+      }
+    }
+
+    function rebuild(){
+      list.innerHTML = '';
+      const cur = sel.value;
+
+      Array.from(sel.options).forEach((opt, idx) => {
+        const it = document.createElement('div');
+        const isActive = !isMulti ? (opt.value === cur) : !!opt.selected;
+        it.className = 'pxItem' + (isActive ? ' active' : '');
+        it.style.display = opt.hidden ? 'none' : '';
+        it.style.opacity = opt.disabled ? '0.55' : '1';
+        it.style.cursor = opt.disabled ? 'not-allowed' : 'pointer';
+
+        if (!isMulti){
+          it.textContent = opt.textContent || opt.value;
+          it.addEventListener('click', () => {
+            if (opt.disabled) return;
+            sel.value = opt.value;
+            sel.dispatchEvent(new Event('change', { bubbles:true }));
+            syncLabel();
+            rebuild(); // update active
+            close();
+          });
+        } else {
+          it.textContent = `${opt.selected ? '☑' : '☐'} ${opt.textContent || opt.value}`;
+          it.addEventListener('click', () => {
+            if (opt.disabled) return;
+            opt.selected = !opt.selected;
+            sel.dispatchEvent(new Event('change', { bubbles:true }));
+            syncLabel();
+            rebuild();
+          });
+        }
+
+        list.appendChild(it);
+      });
+
+      syncLabel();
+    }
+
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+      if (e.key === 'Escape') close();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) close();
+    }, { passive:true });
+
+    // Keep in sync when your code changes select programmatically
+    sel.addEventListener('change', () => {
+      syncLabel();
+      // Cheap refresh for multi; for single refresh highlight if list exists
+      rebuild();
+    });
+
+    // Mount: insert wrap right where select was
+    const parent = sel.parentNode;
+    parent.insertBefore(wrap, sel);
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+
+    rebuild();
+  });
+}
+
+
+function premiumUxBoot_(){
+  // run once after DOM is ready
+  try{ enhanceAllSelectsPremium_(); }catch(e){ console.warn('enhanceAllSelectsPremium_ failed', e); }
+
+  // re-run a bit later (in case some UI is injected after initial render)
+  setTimeout(() => { try{ enhanceAllSelectsPremium_(); ensureCidadeSelectEnhanced_(); }catch(e){} }, 800);
+  setTimeout(() => { try{ enhanceAllSelectsPremium_(); ensureCidadeSelectEnhanced_(); }catch(e){} }, 2000);
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', premiumUxBoot_, { once:true });
+} else {
+  premiumUxBoot_();
+}
+
+/* ===== Premium Select Watcher (keeps custom selects after dynamic DOM updates) ===== */
+function _normTxt_(s){ return String(s||'').trim().toLowerCase(); }
+
+function _isCidadeSelectHeuristic_(sel){
+  if (!sel || sel.tagName !== 'SELECT') return false;
+  const idn = _normTxt_((sel.id||'') + ' ' + (sel.name||'') + ' ' + (sel.getAttribute('aria-label')||''));
+  if (idn.includes('cidade') || idn.includes('city')) return true;
+
+  // placeholder/first options heuristics ("Todas as cidades" etc.)
+  const optTexts = Array.from(sel.options || []).slice(0, 8).map(o => _normTxt_(o.textContent || o.value));
+  const joined = optTexts.join(' | ');
+  if (joined.includes('todas as cidades') || joined.includes('todas las ciudades') || joined.includes('todas as') || joined.includes('todas las')) return true;
+  if (joined.includes('cidade do méxico') || joined.includes('ciudad de méxico') || joined.includes('são paulo') || joined.includes('sao paulo')) return true;
+
+  // label proximity heuristic
+  const box = sel.closest('div,section,fieldset,.panel,.card,.section') || sel.parentElement;
+  const lb = box ? box.querySelector('label') : null;
+  const lbt = _normTxt_(lb?.textContent);
+  if (lbt === 'cidade' || lbt === 'ciudad') return true;
+  return false;
+}
+
+function findCidadeSelects_(){
+  const out = new Set();
+
+  // 1) Label-driven (Cidade/Ciudad)
+  const labels = Array.from(document.querySelectorAll('label'));
+  for (const lb of labels){
+    const t = _normTxt_(lb.textContent);
+    if (t === 'cidade' || t === 'ciudad'){
+      const box = lb.closest('div,section,fieldset,.panel,.card,.section') || lb.parentElement;
+      if (!box) continue;
+      const sel = box.querySelector('select');
+      if (sel) out.add(sel);
+    }
+  }
+
+  // 2) Heuristic scan (id/name/placeholder)
+  Array.from(document.querySelectorAll('select')).forEach(sel => {
+    if (_isCidadeSelectHeuristic_(sel)) out.add(sel);
+  });
+
+  return Array.from(out);
+}
+
+function cleanupOrphanPxWraps_(){
+  // Remove pxSelectWrap that lost its select (can happen when dynamic re-render replaces nodes)
+  document.querySelectorAll('.pxSelectWrap').forEach(w => {
+    const sel = w.querySelector('select');
+    const btn = w.querySelector('.pxSelect');
+    if (!sel || !btn) w.remove();
+  });
+}
+
+function ensureCidadeSelectEnhanced_(){ /* handled by global custom selects */ }
+
+function forceCidadeSelectOverride_(){
+  const targets = findCidadeSelects_ ? findCidadeSelects_() : [];
+  targets.forEach(sel => {
+    if (!sel || sel.dataset?.pxCityForced === '1') return;
+
+    // Build wrapper
+    const wrap = document.createElement('div');
+    wrap.className = 'pxCityWrap';
+
+    const btn = document.createElement('div');
+    btn.className = 'pxCityBtn';
+    btn.tabIndex = 0;
+
+    const label = document.createElement('div');
+    label.className = 'pxLabel';
+
+    const chev = document.createElement('div');
+    chev.className = 'pxChevron';
+
+    btn.appendChild(label);
+    btn.appendChild(chev);
+
+    // Use existing pxMenu styling if available
+    const menu = document.createElement('div');
+    menu.className = 'pxMenu';
+    const list = document.createElement('div');
+    list.className = 'pxMenuList';
+    menu.appendChild(list);
+
+    function syncLabel(){
+      const opt = sel.options[sel.selectedIndex];
+      label.textContent = opt ? (opt.textContent || opt.value) : 'Selecione';
+    }
+
+    function rebuild(){
+      list.innerHTML = '';
+      const cur = sel.value;
+      Array.from(sel.options).forEach(opt => {
+        const it = document.createElement('div');
+        it.className = 'pxItem' + (opt.value === cur ? ' active' : '');
+        it.textContent = opt.textContent || opt.value;
+        it.addEventListener('click', () => {
+          sel.value = opt.value;
+          sel.dispatchEvent(new Event('change', { bubbles:true }));
+          close();
+          syncLabel();
+          // refresh active styles
+          Array.from(list.children).forEach(ch => ch.classList.remove('active'));
+          it.classList.add('active');
+        });
+        list.appendChild(it);
+      });
+      syncLabel();
+    }
+
+    function open(){
+      document.querySelectorAll('.pxMenu.open').forEach(m => m.classList.remove('open'));
+      rebuild();
+      menu.classList.add('open');
+    }
+    function close(){ menu.classList.remove('open'); }
+
+    btn.addEventListener('click', () => {
+      if (menu.classList.contains('open')) close();
+      else open();
+    });
+
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+      if (e.key === 'Escape') close();
+    });
+
+    // close on outside click
+    document.addEventListener('click', (e) => {
+      if (!wrap.contains(e.target)) close();
+    }, { passive:true });
+
+    // mount: replace select with wrap
+    sel.dataset.pxCityForced = '1';
+    sel.classList.add('pxCityNative');
+    const parent = sel.parentNode;
+    parent.insertBefore(wrap, sel);
+    wrap.appendChild(btn);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+
+    // keep synced
+    sel.addEventListener('change', () => syncLabel());
+    try{
+      const mo = new MutationObserver(() => syncLabel());
+      mo.observe(sel, { childList:true, subtree:true });
+    }catch(e){}
+
+    syncLabel();
+  });
+}
+
+
+(function watchSelectChanges_(){
+  const root = document.body;
+  if (!root || !window.MutationObserver) return;
+
+  let t = null;
+  const rerun = () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      try{ enhanceAllSelectsPremium_(); }catch(e){}
+      try{ ensureCidadeSelectEnhanced_(); }catch(e){}
+    }, 80);
+  };
+
+  const obs = new MutationObserver((mutations) => {
+    // only rerun if selects/options or subtree changed meaningfully
+    for (const m of mutations){
+      if (m.type === 'childList'){
+        rerun();
+        return;
+      }
+    }
+  });
+
+  obs.observe(root, { childList:true, subtree:true });
+})();
+/* ===== END Premium Select Watcher ===== */
+
+// Extra watchdog: in some cases options update doesn't trigger a wrapper rebuild (Android/desktop quirks)
+setInterval(() => {
+  try{ ensureCidadeSelectEnhanced_(); }catch(e){}
+}, 1500);
+
+/* =================== END PREMIUM UX PACK (JS) =================== */
+
+</script>
+</body>
+</html>

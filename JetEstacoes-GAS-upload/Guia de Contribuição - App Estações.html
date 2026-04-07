@@ -1,0 +1,198 @@
+# 🤝 Guia de Contribuição — App Estações
+
+> **Leitura obrigatória antes de qualquer alteração no código**
+
+Este guia define **como contribuir** com o App Estações sem quebrar o mapa, o sandbox do Apps Script ou a estabilidade do sistema.
+
+---
+
+## 1. Princípio Fundamental
+
+> **Estabilidade vem antes de qualquer feature.**
+
+O App Estações roda em um ambiente **sensível (Google Apps Script + HtmlService)**. Pequenas mudanças podem quebrar silenciosamente o mapa.
+
+Se algo quebrar:
+➡️ rollback imediato
+
+---
+
+## 2. O que NÃO é permitido (regras absolutas)
+
+🚫 Não usar **template literals** (`` ` ``)
+
+🚫 Não usar **emojis em JavaScript**
+
+🚫 Não usar **HTML multilinha dentro de strings JS**
+
+🚫 Não executar código paralelo antes do `initMap()`
+
+🚫 Não misturar múltiplas features em um único deploy
+
+🚫 Não alterar o `render()` sem entender TODAS as chamadas
+
+---
+
+## 3. Organização do Código
+
+### 3.1 Backend (.gs)
+
+Responsabilidades:
+
+* Leitura de planilhas
+* Normalização de dados
+* Cálculo geográfico
+* Retorno de dados
+
+Regras:
+
+* Backend **não controla UI**
+* Funções novas devem ser puras (sem efeitos colaterais)
+* Sempre manter funções de debug
+
+---
+
+### 3.2 Frontend (index.html)
+
+Responsabilidades:
+
+* Renderização visual
+* Interações do usuário
+* Controle de modo
+
+Regras:
+
+* Qualquer lógica visual passa por `render()`
+* Não criar renderizações paralelas
+* Funções devem ser pequenas e previsíveis
+
+---
+
+## 4. Fluxo Correto para Nova Feature
+
+### Etapa obrigatória
+
+1️⃣ Feature nasce **desligada** (checkbox ou flag)
+
+2️⃣ Validar **backend isolado** (logs / debug)
+
+3️⃣ Adicionar **visual mínimo**
+
+4️⃣ Validar carregamento do mapa
+
+5️⃣ Só então enriquecer UI
+
+⚠️ Nunca pular etapas.
+
+---
+
+## 5. Controle de Render (Ponto Mais Crítico)
+
+Existe **apenas um render central**:
+
+```js
+function render() { ... }
+```
+
+Regras:
+
+* Nunca chamar `render()` em loop
+* Nunca renderizar dentro de `zoom_changed` sem bloqueio de modo
+* Modos exclusivos devem **bloquear render normal**
+
+---
+
+## 6. Modo Exclusivo (Ex: Jet Cross)
+
+Quando um modo exclusivo está ativo:
+
+* Render normal deve ser bloqueado
+* Zoom não pode reativar camadas ocultas
+* Toda a lógica fica centralizada
+
+Isso evita conflitos visuais e bugs difíceis de rastrear.
+
+---
+
+## 7. Deploy — Regras Obrigatórias
+
+Antes de cada deploy:
+
+* [ ] Apenas **uma mudança** por deploy
+* [ ] Criar **nova versão** (nunca reutilizar)
+* [ ] Testar reload múltiplas vezes
+* [ ] Testar zoom in / zoom out
+* [ ] Console sem erros
+
+Se algo falhar:
+➡️ não publicar
+
+---
+
+## 8. Debug e Diagnóstico
+
+### Backend
+
+* Manter funções `debug*`
+* Usar `Logger.log`
+* Nunca remover testes
+
+### Frontend
+
+* Evitar dependência de console manual
+* Preferir validação automática ou visual
+
+---
+
+## 9. Boas Práticas de Código
+
+✅ Funções pequenas
+
+✅ Responsabilidade única
+
+✅ Comentários explicando *por quê*, não *o quê*
+
+✅ Flags explícitas para modos
+
+---
+
+## 10. O que fazer se algo quebrar
+
+1️⃣ Parar imediatamente
+
+2️⃣ Identificar a última mudança
+
+3️⃣ Reverter para versão estável
+
+4️⃣ Corrigir em ambiente isolado
+
+Nunca tentar "consertar direto em produção".
+
+---
+
+## 11. Responsabilidade de Quem Contribui
+
+Quem altera o código:
+
+* Assume responsabilidade pela estabilidade
+* Deve entender o README Técnico
+* Deve respeitar este guia
+
+Alterações fora dessas regras **não são aceitas**.
+
+---
+
+## 12. Filosofia do Projeto
+
+> **Código previsível é mais valioso que código rápido.**
+
+Este projeto prioriza:
+
+* Clareza
+* Estabilidade
+* Evolução controlada
+
+---
+
+📌 **Este Guia de Contribuição faz parte do sistema.**
+Ele deve ser consultado antes de qualquer alteração.
