@@ -4771,8 +4771,12 @@ input:focus, select:focus {
 
       const labelTxt = SHOW_CITY_COUNT ? `${cidade} · ${lista.length}` : `${cidade}`;
 
-      // Centroide filtrado por bounding box do pais
-      const posInicial = calcularCentroCidadeFiltrado_(lista) || centro;
+      // Centroide filtrado -- mediana robusta
+      var posFiltrada = calcularCentroCidadeFiltrado_(lista);
+      if (!posFiltrada || !isFinite(posFiltrada.lat) || !isFinite(posFiltrada.lng)) {
+        posFiltrada = centro;
+      }
+      const posInicial = posFiltrada;
       const marker = new google.maps.Marker({
         position: posInicial,
         map,
@@ -4819,13 +4823,20 @@ input:focus, select:focus {
     var lngsF = lista.map(function(e){ return Number(e.lng); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
     var medLat = latsF[Math.floor(latsF.length/2)] || 0;
     var medLng = lngsF[Math.floor(lngsF.length/2)] || 0;
-    // Incluir apenas estacoes dentro de 1 grau da mediana (~110km)
-    var TOLERANCIA = 1.5;
+    // Incluir estacoes dentro de 3 graus da mediana (~330km)
+    // Fallback: se filtrou menos de 30% da lista, usar completa
+    var TOLERANCIA = 3.0;
     var listaFiltrada = lista.filter(function(e) {
       return Math.abs(Number(e.lat) - medLat) <= TOLERANCIA &&
              Math.abs(Number(e.lng) - medLng) <= TOLERANCIA;
     });
-    if (!listaFiltrada.length) listaFiltrada = lista;
+    if (!listaFiltrada.length || listaFiltrada.length < lista.length * 0.3) {
+      listaFiltrada = lista;
+    }
+    // Fallback adicional: se ainda vazio, usar lista toda
+    if (listaFiltrada.length < Math.max(1, Math.floor(lista.length * 0.5))) {
+      listaFiltrada = lista;
+    }
 
     const bounds = new google.maps.LatLngBounds();
     let n = 0;
@@ -7733,7 +7744,7 @@ function cExecutarImportacao() {
         cidade:   cidade,
         bairro:   '',
         endereco: r.endereco,
-        pais:     'BR'
+        pais:     detectarPaisPorCoords_(r.lat, r.lng)
       }
     };
   });
@@ -8614,6 +8625,18 @@ if ('serviceWorker' in navigator) {
 
 
 
+
+
+// ── DETECTAR PAIS PELAS COORDENADAS ──────────────────────────────
+function detectarPaisPorCoords_(lat, lng) {
+  var la = Number(lat), ln = Number(lng);
+  if (!isFinite(la) || !isFinite(ln)) return 'BR';
+  if (la >= 14.5 && la <= 32.7 && ln >= -117.1 && ln <= -86.7) return 'MX';
+  if (la >= -55.0 && la <= -21.8 && ln >= -73.6 && ln <= -53.6) return 'AR';
+  if (la >= -55.9 && la <= -17.5 && ln >= -75.6 && ln <= -66.4) return 'CL';
+  if (la >= -4.2  && la <= 12.5  && ln >= -79.0 && ln <= -66.9) return 'CO';
+  return 'BR';
+}
 
 // ── CENTROIDE ROBUSTO (MEDIANA PURA) ─────────────────────────────
 // Mediana e resistente a outliers sem precisar de bbox
