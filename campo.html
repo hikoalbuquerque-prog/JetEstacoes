@@ -4814,10 +4814,35 @@ input:focus, select:focus {
   function fitBoundsCidade(lista) {
     if (!lista || !lista.length) return;
 
+    // Filtrar estacoes pelo bbox do pais para evitar distorcao
+    var listaFiltrada = lista;
+    if (typeof BBOX_PAIS !== 'undefined' && typeof calcularCentroCidadeFiltrado_ === 'function') {
+      var contPais = {};
+      lista.forEach(function(e) {
+        var p = (e.pais || 'BR').toString().toUpperCase().trim();
+        if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') p = 'MX';
+        else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
+        contPais[p] = (contPais[p] || 0) + 1;
+      });
+      var paisDom = 'BR', maxC = 0;
+      Object.keys(contPais).forEach(function(p) {
+        if (contPais[p] > maxC) { maxC = contPais[p]; paisDom = p; }
+      });
+      var bbox = BBOX_PAIS[paisDom];
+      if (bbox) {
+        var tmp = lista.filter(function(e) {
+          var la = Number(e.lat), ln = Number(e.lng);
+          return la >= bbox.minLat && la <= bbox.maxLat &&
+                 ln >= bbox.minLng && ln <= bbox.maxLng;
+        });
+        if (tmp.length) listaFiltrada = tmp;
+      }
+    }
+
     const bounds = new google.maps.LatLngBounds();
     let n = 0;
 
-    lista.forEach(e => {
+    listaFiltrada.forEach(e => {
       const la = parseCoord_(e?.lat);
       const ln = parseCoord_(e?.lng);
       if (la == null || ln == null) return;
