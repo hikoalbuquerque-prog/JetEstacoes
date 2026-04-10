@@ -4772,10 +4772,10 @@ input:focus, select:focus {
 
       const labelTxt = SHOW_CITY_COUNT ? `${cidade} · ${lista.length}` : `${cidade}`;
 
-      // Usar geocode da cidade para posicionamento exato
-      // O centróide é usado como fallback enquanto o geocode não chegou
+      // Usar geocode cacheado se disponivel, senao centroide como fallback
+      const posInicial = _cidadeGeocodeCache[cidade] || centro;
       const marker = new google.maps.Marker({
-        position: centro,
+        position: posInicial,
         map,
         label: {
           text: labelTxt,
@@ -4806,10 +4806,12 @@ input:focus, select:focus {
         safeRenderRequest_(true);
       });
 
-      // Geocode assincrono para posicionar no centro exato da cidade
-      (function(m, cid, est) {
-        geocodeCidadeParaMarker_(m, cid, est);
-      })(marker, cidade, lista);
+      // Geocode assincrono — so dispara se nao tiver no cache
+      if (!_cidadeGeocodeCache[cidade]) {
+        (function(m, cid, est) {
+          geocodeCidadeParaMarker_(m, cid, est);
+        })(marker, cidade, lista);
+      }
 
       markersCidade.push(marker);
     });
