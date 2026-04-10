@@ -4711,6 +4711,7 @@ input:focus, select:focus {
       const la = parseCoord_(e?.lat);
       const ln = parseCoord_(e?.lng);
       if (la == null || ln == null) return;
+      if (Math.abs(la) < 0.01 && Math.abs(ln) < 0.01) return; // ignorar 0,0
       lat += la; lng += ln; n++;
     });
     if (!n) return null;
@@ -7356,15 +7357,15 @@ function carregarMonitor() {
   _gasRun('listarMonitor', undefined,
     function(codigos) {
       _monitorCodigos = new Set(codigos || []);
-      // Enriquecer estacoes ja carregadas
       if (window.estacoes) {
         window.estacoes.forEach(function(e) {
           e.monitor = _monitorCodigos.has(e.codigo);
         });
       }
       atualizarMonitorCount();
-    })
-    .withFailureHandler(function(){});
+    },
+    function() {} // silencioso em caso de erro
+  );
 }
 
 /* ---- TOGGLE MONITOR no painel de edicao ---- */
@@ -8662,8 +8663,19 @@ function calcularCentroCidadeFiltrado_(lista) {
 
   var lats = [], lngs = [];
   lista.forEach(function(e) {
-    var la = Number(e.lat), ln = Number(e.lng);
+    // Usar parseCoord_ para lidar com strings com virgula e outros formatos
+    var la = typeof parseCoord_ === 'function'
+      ? parseCoord_(e.lat)
+      : parseFloat(String(e.lat || '').replace(',', '.'));
+    var ln = typeof parseCoord_ === 'function'
+      ? parseCoord_(e.lng)
+      : parseFloat(String(e.lng || '').replace(',', '.'));
+
+    if (la == null) la = Number(e.lat);
+    if (ln == null) ln = Number(e.lng);
+
     if (isFinite(la) && isFinite(ln) &&
+        Math.abs(la) > 0.01 && Math.abs(ln) > 0.01 &&
         Math.abs(la) <= 90 && Math.abs(ln) <= 180) {
       lats.push(la);
       lngs.push(ln);
