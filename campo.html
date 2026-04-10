@@ -4109,8 +4109,11 @@ input:focus, select:focus {
 
     if (lblBaseCount) lblBaseCount.textContent = String(estacoes.length);
 
-    // ✅ render só via scheduler seguro (evita crash se DOM ainda bindando)
-    safeRenderRequest_(true);
+    // Pre-geocodificar todas as cidades antes do primeiro render
+    // Garante que os pins ficam no lugar certo desde o inicio
+    preGeocodeTodasCidades_(function() {
+      safeRenderRequest_(true);
+    });
   }
 
   /* ===============================
@@ -8605,6 +8608,59 @@ if ('serviceWorker' in navigator) {
 /* ---- BOOT ---- */
 
 
+
+
+// ── PRE-GEOCODE DE CIDADES ────────────────────────────────────────
+// Geocodifica todas as cidades de uma vez antes do primeiro render
+// Garante que os pins aparecem no lugar certo desde o inicio
+function preGeocodeTodasCidades_(callback) {
+  if (!window.google || !google.maps || !google.maps.Geocoder) {
+    if (callback) callback();
+    return;
+  }
+
+  var cidades = Object.keys(estacoesPorCidade);
+  var pendentes = 0;
+  var geocoder = new google.maps.Geocoder();
+
+  cidades.forEach(function(cidade) {
+    // Pular se ja esta no cache
+    if (_cidadeGeocodeCache[cidade]) return;
+
+    var lista = estacoesPorCidade[cidade];
+    if (!lista || !lista.length) return;
+
+    // Detectar pais
+    var pais = 'Brasil';
+    var p = (lista[0].pais || '').toString().toUpperCase().trim();
+    if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') pais = 'México';
+    else if (p === 'CL') pais = 'Chile';
+    else if (p === 'AR') pais = 'Argentina';
+    else if (p === 'CO') pais = 'Colombia';
+
+    pendentes++;
+    geocoder.geocode({ address: cidade + ', ' + pais }, function(results, status) {
+      if (status === 'OK' && results && results.length) {
+        var loc = results[0].geometry.location;
+        _cidadeGeocodeCache[cidade] = { lat: loc.lat(), lng: loc.lng() };
+
+        // Guardar bounds para verificacao de estacoes fora
+        var bounds = results[0].geometry.viewport;
+        if (bounds) {
+          var fora = (estacoesPorCidade[cidade] || []).filter(function(e) {
+            return !bounds.contains(new google.maps.LatLng(e.lat, e.lng));
+          });
+          if (fora.length > 0) _cidadeEstacoesFora[cidade] = fora.length;
+        }
+      }
+      pendentes--;
+      if (pendentes === 0 && callback) callback();
+    });
+  });
+
+  // Se nao havia nenhuma cidade para geocodificar
+  if (pendentes === 0 && callback) callback();
+}
 
 // ── GEOCODE DE CIDADE PARA PIN EXATO ─────────────────────────────
 var _cidadeGeocodeCache = {};
