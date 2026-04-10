@@ -3312,16 +3312,13 @@ input:focus, select:focus {
         });
 
         marker.addListener('mouseover', function() {
-          const html = `
-            <div class="iwCard">
-              <div class="iwHead">Jet Cross</div>
-              <div class="iwBody">
-                Status: <b>${escapeHtml_(d.statusComparacao || '-')}</b><br/>
-                Origem: <b>${escapeHtml_(d.origem || '-')}</b>
-                ${d.codigo ? `<div class="iwMeta">Código: ${escapeHtml_(d.codigo)}</div>` : ``}
-              </div>
-            </div>
-          `;
+          var html = '<div class="iwCard">'
+            + '<div class="iwHead">Jet Cross</div>'
+            + '<div class="iwBody">'
+            + 'Status: <b>' + escapeHtml_(d.statusComparacao || '-') + '</b><br/>'
+            + 'Origem: <b>' + escapeHtml_(d.origem || '-') + '</b>'
+            + (d.codigo ? '<div class="iwMeta">Codigo: ' + escapeHtml_(d.codigo) + '</div>' : '')
+            + '</div></div>';
           infoWindow.setContent(html);
           infoWindow.open(map, marker);
         });
@@ -3393,7 +3390,7 @@ input:focus, select:focus {
     }
     dash.banner.style.display = 'block';
     dash.banner.textContent = text;
-    dash.banner.className = 'dash-banner' + (kind ? ` ${kind}` : '');
+    dash.banner.className = 'dash-banner' + (kind ? ' ' + kind : '');
   }
 
   function updateDashboardFromState_(s, metrics){
@@ -3424,7 +3421,7 @@ input:focus, select:focus {
     if (enterprise.privSub) enterprise.privSub.textContent = (s.city ? 'Cidade filtrada' : 'Todas as cidades');
     if (enterprise.concSub) enterprise.concSub.textContent = (s.city ? 'Cidade filtrada' : 'Todas as cidades');
 
-    if (enterprise.dbgMs)  enterprise.dbgMs.textContent  = (metrics.renderMs != null ? `${metrics.renderMs}ms` : '--');
+    if (enterprise.dbgMs)  enterprise.dbgMs.textContent = (metrics.renderMs != null ? metrics.renderMs + 'ms' : '--');
     if (enterprise.dbgKey) enterprise.dbgKey.textContent = (metrics.lastKey || '--');
   }
 
@@ -4262,7 +4259,7 @@ input:focus, select:focus {
       const cid = (e.cidade || '').toString().trim();
       const tipo = (e.tipo || '').toString().trim();
       const mod  = (e.modalidade || '').toString().trim();
-      e.__id = `FALL:${cid}|${tipo}|${mod}|${e.lat}|${e.lng}|${end}`;
+      e.__id = 'FALL:' + cid + '|' + tipo + '|' + mod + '|' + e.lat + '|' + e.lng + '|' + end;
     });
 
     agruparEstacoesPorCidade();
@@ -4395,7 +4392,7 @@ input:focus, select:focus {
     return;
   }
 
-  elCidade.innerHTML = `<option value="">Todas as cidades</option>`;
+  elCidade.innerHTML = '<option value="">Todas as cidades</option>';
   [...new Set(estacoes.map(e => e.cidade).filter(Boolean))].sort().forEach(c => {
     const o = document.createElement('option');
     o.value = c; o.textContent = c;
@@ -4512,7 +4509,7 @@ input:focus, select:focus {
   }
 
   function iconKeyFor_(e){
-    return `${e.tipo}|${e.statusEstacao}|${(e.modalidade||'').toString().toUpperCase()}`;
+    return e.tipo + '|' + e.statusEstacao + '|' + (e.modalidade || '').toString().toUpperCase();
   }
 
   function markerBudgetForZoom_(z){
@@ -4677,14 +4674,14 @@ input:focus, select:focus {
       else patN++;
     }
 
-    if (elDashTotal) elDashTotal.textContent = `Total: ${visiveis.length}`;
-    if (elDashPublica) elDashPublica.textContent = `Pública: ${pubN}`;
-    if (elDashPrivada) elDashPrivada.textContent = `Privada: ${priN}`;
-    if (elDashConcorrente) elDashConcorrente.textContent = `Concorrente: ${conN}`;
-    if (elDashPatinete) elDashPatinete.textContent = `🛴 ${patN}`;
-    if (elDashBike) elDashBike.textContent = `🚲 ${bikeN}`;
-    if (elDashHibrida) elDashHibrida.textContent = `♦ ${hibN}`;
-    if (elDashRender) elDashRender.textContent = `Render: ${visiveis.length}`;
+    if (elDashTotal) elDashTotal.textContent = 'Total: ' + visiveis.length;
+    if (elDashPublica) elDashPublica.textContent = 'Publica: ' + pubN;
+    if (elDashPrivada) elDashPrivada.textContent = 'Privada: ' + priN;
+    if (elDashConcorrente) elDashConcorrente.textContent = 'Concorrente: ' + conN;
+    if (elDashPatinete) elDashPatinete.textContent = patN;
+    if (elDashBike) elDashBike.textContent = bikeN;
+    if (elDashHibrida) elDashHibrida.textContent = hibN;
+    if (elDashRender) elDashRender.textContent = 'Render: ' + visiveis.length;
 
     const ms = Math.round(performance.now() - t0);
     window.__LAST_METRICS__ = buildMetrics_({
@@ -4707,19 +4704,15 @@ input:focus, select:focus {
     const tipo = (e.tipo || '-').toString();
     const st = (e.statusEstacao || '-').toString();
 
-    const html = `
-      <div class="iwCard">
-        <div class="iwHead">${escapeHtml_(titulo)}</div>
-        <div class="iwBody">
-          <div>${escapeHtml_(e.endereco || '-')}</div>
-          <div class="iwMeta">${escapeHtml_(cidade)}</div>
-          <div style="margin-top:8px">
-            Tipo: <b>${escapeHtml_(tipo)}</b><br/>
-            Status: <b>${escapeHtml_(st)}</b>
-          </div>
-        </div>
-      </div>
-    `;
+    var html = '<div class="iwCard">'
+      + '<div class="iwHead">' + escapeHtml_(titulo) + '</div>'
+      + '<div class="iwBody">'
+      + '<div>' + escapeHtml_(e.endereco || '-') + '</div>'
+      + '<div class="iwMeta">' + escapeHtml_(cidade) + '</div>'
+      + '<div style="margin-top:8px">'
+      + 'Tipo: <b>' + escapeHtml_(tipo) + '</b><br/>'
+      + 'Status: <b>' + escapeHtml_(st) + '</b>'
+      + '</div></div></div>';
     infoWindow.setContent(html);
     infoWindow.open(map, m);
   }
@@ -4749,7 +4742,7 @@ input:focus, select:focus {
 
     const dups = estacoes.filter(e => e.dupGrupo);
     if (elDashboardDup){
-      elDashboardDup.innerHTML = `<b>🔁 Duplicidades:</b> ${dups.length}`;
+      elDashboardDup.innerHTML = '<b>Duplicidades:</b> ' + dups.length;
       elDashboardDup.style.display = 'block';
     }
   }
@@ -4821,13 +4814,11 @@ input:focus, select:focus {
 
     const modoRaio = !!MAP_STATE?.radius;
 
-    const html = `
-      <b>📍 Análise ${modoRaio ? 'por Raio (' + raio + 'm)' : 'da Área Visível'}</b><br>
-      Pública: ${publica} |
-      Privada: ${privada} |
-      Concorrente: ${concorrente} |
-      Total: ${viewportEstacoes.length}
-    `;
+    var html = '<b>Analise ' + (modoRaio ? 'por Raio (' + raio + 'm)' : 'da Area Visivel') + '</b><br>'
+      + 'Publica: ' + publica + ' | '
+      + 'Privada: ' + privada + ' | '
+      + 'Concorrente: ' + concorrente + ' | '
+      + 'Total: ' + viewportEstacoes.length;
     if (elDashboardSP){
       elDashboardSP.innerHTML = html;
       elDashboardSP.style.display = 'block';
@@ -4899,21 +4890,18 @@ input:focus, select:focus {
 
   function htmlTooltipCidade(cidade, b){
     const c = escapeHtml_(cidade || '-');
-    return `
-      <div class="iwCard">
-        <div class="iwHead">${c}</div>
-        <div class="iwBody">
-          <div><b>Total:</b> ${b.total}</div>
-          <div style="margin-top:6px">
-            Pública: <b>${b.pub}</b> · Privada: <b>${b.pri}</b> · Concorrente: <b>${b.con}</b>
-          </div>
-          <div class="iwMeta" style="margin-top:6px">
-            🛴 ${b.pat} · 🚲 ${b.bike} · ♦ ${b.hib}
-          </div>
-          <div style="margin-top:8px; opacity:.85">Clique para entrar na cidade</div>
-        </div>
-      </div>
-    `;
+    return '<div class="iwCard">'
+      + '<div class="iwHead">' + c + '</div>'
+      + '<div class="iwBody">'
+      + '<div><b>Total:</b> ' + b.total + '</div>'
+      + '<div style="margin-top:6px">'
+      + 'Publica: <b>' + b.pub + '</b> &middot; Privada: <b>' + b.pri + '</b> &middot; Concorrente: <b>' + b.con + '</b>'
+      + '</div>'
+      + '<div class="iwMeta" style="margin-top:6px">'
+      + b.pat + ' pat &middot; ' + b.bike + ' bike &middot; ' + b.hib + ' hib'
+      + '</div>'
+      + '<div style="margin-top:8px;opacity:.85">Clique para entrar na cidade</div>'
+      + '</div></div>';
   }
 
   function criarMarkersCidade() {
@@ -4932,7 +4920,7 @@ input:focus, select:focus {
       const centro = calcularCentroCidade(lista);
       if (!centro) return;
 
-      const labelTxt = SHOW_CITY_COUNT ? `${cidade} · ${lista.length}` : `${cidade}`;
+      var labelTxt = SHOW_CITY_COUNT ? (cidade + ' (' + lista.length + ')') : cidade;
 
       // Centroide filtrado -- mediana robusta
       var posFiltrada = calcularCentroCidadeFiltrado_(lista);
@@ -5028,7 +5016,7 @@ input:focus, select:focus {
   let polyLazyLastCity = null;
 
   function colorFromGroupFase_(grupo, fase){
-    const s = `${grupo || ''}::${fase || ''}`;
+    var s = (grupo || '') + '::' + (fase || '');
     let h = 0;
     for (let i=0;i<s.length;i++) h = ((h<<5)-h) + s.charCodeAt(i), h |= 0;
     h = Math.abs(h);
@@ -5046,7 +5034,7 @@ input:focus, select:focus {
 
     const id =
       (p.id || '').toString().trim() ||
-      `${cidade}__${grupo}__${fase}__${nome}__${Math.random().toString(16).slice(2)}`;
+      cidade + '__' + grupo + '__' + fase + '__' + nome + '__' + Math.random().toString(16).slice(2);
 
     const rawPath = p.poligono || p.path || [];
     const poligono = (Array.isArray(rawPath) ? rawPath : [])
@@ -5295,7 +5283,7 @@ input:focus, select:focus {
     hudCon.textContent = elDashConcorrente?.textContent || 'Concorrente: 0';
 
     if (hudRaio) hudRaio.style.display = (!!MAP_STATE?.radius) ? 'block' : 'none';
-    if (hudRaioVal) hudRaioVal.textContent = `${Number(elRaioInput?.value)||200}m`;
+    if (hudRaioVal) hudRaioVal.textContent = (Number((elRaioInput && elRaioInput.value) || 0) || 200) + 'm';
 
     if (lblPoli) lblPoli.textContent = elChkPoligonos?.checked ? 'ON' : 'OFF';
     if (lblRaio) lblRaio.textContent = (MAP_STATE?.radius ? 'ON' : 'OFF');
