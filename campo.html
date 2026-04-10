@@ -1060,6 +1060,38 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 .map-fab-loc:active{transform:scale(.93)}
 
 
+
+/* Locais Prioritarios */
+.loc-pri-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.loc-pri-linha:last-child { border-bottom: none; }
+.loc-pri-linha:hover { opacity: .75; }
+.loc-pri-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+.loc-pri-nome {
+  font-size: 11px;
+  color: rgba(255,255,255,.7);
+  flex: 1;
+}
+.loc-pri-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,.5);
+  min-width: 24px;
+  text-align: right;
+}
+
 /* Speed-dial labels */
 .fab-dial-label {
   font-size: 11px;
@@ -2034,6 +2066,12 @@ input:focus, select:focus {
           <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm0-12c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"/></svg>
         </button>
       </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="fab-dial-label">Locais</span>
+        <button onclick="cAbrirLocaisPrioritarios();cFecharSpeedDial()" title="Locais Prioritarios" class="map-fab-ctrl" id="fabLocais">
+          <svg viewBox="0 0 24 24" style="fill:rgba(255,255,255,.8)"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </button>
+      </div>
     </div>
     <button id="fabDialToggle" onclick="cToggleSpeedDial()" class="map-fab-ctrl" title="Controles" style="background:rgba(13,18,30,.95);border-color:rgba(255,255,255,.2)">
       <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:rgba(255,255,255,.8)"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -2297,6 +2335,45 @@ input:focus, select:focus {
 </div>
 
 <!-- TOAST -->
+
+
+<!-- PAINEL LOCAIS PRIORITARIOS -->
+<div id="painelLocaisPri" style="
+  display:none;
+  position:fixed;
+  bottom:100px;
+  right:20px;
+  z-index:7400;
+  background:rgba(13,18,30,.95);
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;
+  padding:14px 16px;
+  min-width:220px;
+  max-width:260px;
+  box-shadow:0 8px 28px rgba(0,0,0,.55);
+  backdrop-filter:blur(10px);
+">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;color:white;letter-spacing:.04em">LOCAIS PRIORITARIOS</div>
+    <button onclick="fecharPainelLocais()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;font-size:16px;line-height:1;padding:0">x</button>
+  </div>
+  <div id="painelLocaisContador" style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px"></div>
+  <div id="painelLocaisLista"></div>
+  <div style="margin-top:10px;font-size:9px;color:rgba(255,255,255,.25);text-align:right">OpenStreetMap · Overpass API</div>
+  <button onclick="mostrarTodasLocais()" id="btnMostrarTodasLocais" style="
+    display:none;
+    width:100%;
+    margin-top:10px;
+    padding:8px;
+    border-radius:8px;
+    background:rgba(48,127,226,.15);
+    border:1px solid rgba(48,127,226,.3);
+    color:#60a5fa;
+    font-size:11px;
+    font-weight:700;
+    cursor:pointer
+  ">Mostrar todas</button>
+</div>
 
 <!-- MODAL CLIQUE RAPIDO NO MAPA -->
 <div id="mapaClickModal" style="display:none;position:fixed;z-index:8700;pointer-events:none;top:0;left:0;width:100%;height:100%;">
@@ -8765,6 +8842,184 @@ function preGeocodeTodasCidades_(callback) {
   if (pendentes === 0 && callback) callback();
 }
 
+
+// ── LOCAIS PRIORITARIOS (Overpass API) ───────────────────────────
+
+var LOC_CATEGORIAS = [
+  { key: 'restaurante', nome: 'Restaurante / Cafe', cor: '#f97316',
+    query: 'node["amenity"~"restaurant|cafe|fast_food"]' },
+  { key: 'hotel', nome: 'Hotel', cor: '#8b5cf6',
+    query: 'node["tourism"~"hotel|hostel|motel"]' },
+  { key: 'comercial', nome: 'Comercial', cor: '#f59e0b',
+    query: 'node["shop"~"mall|supermarket|department_store"]' },
+  { key: 'transporte', nome: 'Transporte', cor: '#38bdf8',
+    query: 'node["public_transport"~"station|stop_position"]' },
+  { key: 'academia', nome: 'Academia', cor: '#4ade80',
+    query: 'node["leisure"="fitness_centre"]' },
+  { key: 'educacao', nome: 'Educacao', cor: '#818cf8',
+    query: 'node["amenity"~"school|university|college"]' },
+  { key: 'saude', nome: 'Saude', cor: '#f87171',
+    query: 'node["amenity"~"hospital|clinic|pharmacy"]' },
+  { key: 'escritorio', nome: 'Escritorio / Banco', cor: '#94a3b8',
+    query: 'node["amenity"~"bank|office"]["office"]' }
+];
+
+var _locaisResultados = {};
+var _locaisMarkers = [];
+var _locaisVisiveis = false;
+var _locaisCategoriaAtiva = null;
+
+function buscarLocaisPrioritarios(lat, lng, raioMetros) {
+  raioMetros = raioMetros || 500;
+  _locaisResultados = {};
+  _locaisMarkers.forEach(function(m){ m.setMap(null); });
+  _locaisMarkers = [];
+
+  var painel = document.getElementById('painelLocaisPri');
+  var lista  = document.getElementById('painelLocaisLista');
+  var contEl = document.getElementById('painelLocaisContador');
+  if (!painel || !lista) return;
+
+  lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:8px">Buscando...</div>';
+  contEl.textContent = '';
+  painel.style.display = 'block';
+
+  // Montar query Overpass
+  var queries = LOC_CATEGORIAS.map(function(cat) {
+    return cat.query + '(around:' + raioMetros + ',' + lat + ',' + lng + ');';
+  }).join('
+');
+
+  var overpassQuery = '[out:json][timeout:10];
+(
+' + queries + '
+);
+out body;';
+  var url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
+
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      _processarResultadosLocais_(data.elements || [], lat, lng);
+    })
+    .catch(function(e) {
+      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Erro ao buscar locais</div>';
+    });
+}
+
+function _processarResultadosLocais_(elements, centerLat, centerLng) {
+  // Classificar por categoria
+  var porCategoria = {};
+  LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
+
+  elements.forEach(function(el) {
+    var tags = el.tags || {};
+    // Detectar categoria
+    var cat = null;
+    if (tags.amenity && /restaurant|cafe|fast_food/.test(tags.amenity)) cat = 'restaurante';
+    else if (tags.tourism && /hotel|hostel|motel/.test(tags.tourism)) cat = 'hotel';
+    else if (tags.shop && /mall|supermarket|department_store/.test(tags.shop)) cat = 'comercial';
+    else if (tags.public_transport && /station|stop_position/.test(tags.public_transport)) cat = 'transporte';
+    else if (tags.leisure === 'fitness_centre') cat = 'academia';
+    else if (tags.amenity && /school|university|college/.test(tags.amenity)) cat = 'educacao';
+    else if (tags.amenity && /hospital|clinic|pharmacy/.test(tags.amenity)) cat = 'saude';
+    else if (tags.amenity === 'bank' || tags.office) cat = 'escritorio';
+
+    if (cat && el.lat && el.lon) {
+      porCategoria[cat].push({
+        lat: el.lat, lng: el.lon,
+        nome: tags.name || tags['name:pt'] || '',
+        cat: cat
+      });
+    }
+  });
+
+  _locaisResultados = porCategoria;
+
+  var total = 0;
+  LOC_CATEGORIAS.forEach(function(cat) { total += (porCategoria[cat.key] || []).length; });
+
+  // Renderizar painel
+  var lista  = document.getElementById('painelLocaisLista');
+  var contEl = document.getElementById('painelLocaisContador');
+  var btnMostrar = document.getElementById('btnMostrarTodasLocais');
+
+  contEl.textContent = '(' + total + ')';
+
+  var html = '';
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var n = (porCategoria[cat.key] || []).length;
+    if (n === 0) return;
+    html += '<div class="loc-pri-linha" onclick="filtrarLocaisCategoria('' + cat.key + '')">';
+    html += '<div class="loc-pri-dot" style="background:' + cat.cor + '"></div>';
+    html += '<div class="loc-pri-nome">' + cat.nome + '</div>';
+    html += '<div class="loc-pri-count" style="color:' + cat.cor + '">' + n + '</div>';
+    html += '</div>';
+  });
+
+  lista.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Nenhum local encontrado</div>';
+  if (btnMostrar) btnMostrar.style.display = total > 0 ? 'block' : 'none';
+
+  // Mostrar markers de todos por default
+  mostrarTodasLocais();
+}
+
+function _criarMarkerLocal_(item, cor) {
+  if (!window._gmap || !window.google) return null;
+  var marker = new google.maps.Marker({
+    position: { lat: item.lat, lng: item.lng },
+    map: window._gmap,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 6,
+      fillColor: cor,
+      fillOpacity: 0.85,
+      strokeColor: '#fff',
+      strokeWeight: 1.5
+    },
+    title: item.nome || item.cat,
+    zIndex: 100
+  });
+  return marker;
+}
+
+function filtrarLocaisCategoria(catKey) {
+  _locaisMarkers.forEach(function(m){ m.setMap(null); });
+  _locaisMarkers = [];
+  _locaisCategoriaAtiva = catKey;
+
+  var cat = LOC_CATEGORIAS.find(function(c){ return c.key === catKey; });
+  var items = _locaisResultados[catKey] || [];
+  var cor = cat ? cat.cor : '#60a5fa';
+
+  items.forEach(function(item) {
+    var m = _criarMarkerLocal_(item, cor);
+    if (m) _locaisMarkers.push(m);
+  });
+}
+
+function mostrarTodasLocais() {
+  _locaisMarkers.forEach(function(m){ m.setMap(null); });
+  _locaisMarkers = [];
+  _locaisCategoriaAtiva = null;
+
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var items = _locaisResultados[cat.key] || [];
+    items.forEach(function(item) {
+      var m = _criarMarkerLocal_(item, cat.cor);
+      if (m) _locaisMarkers.push(m);
+    });
+  });
+}
+
+function fecharPainelLocais() {
+  var painel = document.getElementById('painelLocaisPri');
+  if (painel) painel.style.display = 'none';
+  _locaisMarkers.forEach(function(m){ m.setMap(null); });
+  _locaisMarkers = [];
+  _locaisResultados = {};
+}
+
 // ── GEOCODE DE CIDADE PARA PIN EXATO ─────────────────────────────
 var _cidadeGeocodeCache = {};
 
@@ -8851,6 +9106,14 @@ document.addEventListener('click', function(e) {
 
 // ── MODAL RAPIDO DE CLIQUE NO MAPA ────────────────────────────────
 var _clickModalLatLng = null;
+
+
+function cAbrirLocaisPrioritarios() {
+  var gmap = window._gmap;
+  if (!gmap) { cToast('Mapa nao carregado', 'warn'); return; }
+  var center = gmap.getCenter();
+  buscarLocaisPrioritarios(center.lat(), center.lng(), 500);
+}
 
 function cMostrarClickModal(latLng, domEvent) {
   if (!CS.user) return; // so mostra se logado
