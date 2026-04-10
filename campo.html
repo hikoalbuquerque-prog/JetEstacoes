@@ -8663,7 +8663,6 @@ function calcularCentroCidadeFiltrado_(lista) {
 
   var lats = [], lngs = [];
   lista.forEach(function(e) {
-    // Usar parseCoord_ para lidar com strings com virgula e outros formatos
     var la = typeof parseCoord_ === 'function'
       ? parseCoord_(e.lat)
       : parseFloat(String(e.lat || '').replace(',', '.'));
@@ -8674,13 +8673,32 @@ function calcularCentroCidadeFiltrado_(lista) {
     if (la == null) la = Number(e.lat);
     if (ln == null) ln = Number(e.lng);
 
-    if (isFinite(la) && isFinite(ln) &&
-        Math.abs(la) > 0.01 && Math.abs(ln) > 0.01 &&
-        Math.abs(la) <= 90 && Math.abs(ln) <= 180) {
+    if (!isFinite(la) || !isFinite(ln)) return;
+    if (Math.abs(la) < 0.01 || Math.abs(ln) < 0.01) return;
+    if (Math.abs(la) > 90 || Math.abs(ln) > 180) return;
+
+    // IGNORAR coordenadas inteiras -- sao dados incorretos (ex: -23, -46)
+    var laStr = String(e.lat || '');
+    var lnStr = String(e.lng || '');
+    var laTemDecimal = laStr.indexOf('.') !== -1 || laStr.indexOf(',') !== -1;
+    var lnTemDecimal = lnStr.indexOf('.') !== -1 || lnStr.indexOf(',') !== -1;
+    if (!laTemDecimal || !lnTemDecimal) return;
+
+    lats.push(la);
+    lngs.push(ln);
+  });
+
+  // Fallback: se todos foram filtrados (ex: todos inteiros), usar parseCoord_ sem filtro
+  if (!lats.length) {
+    lista.forEach(function(e) {
+      var la = typeof parseCoord_ === 'function' ? parseCoord_(e.lat) : parseFloat(e.lat);
+      var ln = typeof parseCoord_ === 'function' ? parseCoord_(e.lng) : parseFloat(e.lng);
+      if (la == null || ln == null) return;
+      if (!isFinite(la) || !isFinite(ln)) return;
       lats.push(la);
       lngs.push(ln);
-    }
-  });
+    });
+  }
 
   if (!lats.length) return null;
   return { lat: mediana_(lats), lng: mediana_(lngs) };
