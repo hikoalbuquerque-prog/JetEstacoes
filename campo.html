@@ -1155,6 +1155,243 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 .spin{animation:spin .7s linear infinite;display:inline-block}
 
 
+
+
+/* ═══════════════════════════════════════════
+   JET DESIGN SYSTEM — overrides v2
+   ═══════════════════════════════════════════ */
+
+/* Variáveis JET */
+:root {
+  --jet-blue: #307FE2;
+  --jet-blue-dim: rgba(48,127,226,.15);
+  --jet-blue-border: rgba(48,127,226,.35);
+  --jet-bg: #080e1a;
+  --jet-panel: #0c1423;
+  --jet-card: rgba(255,255,255,.04);
+  --jet-border: rgba(255,255,255,.09);
+  --jet-fg: #f0f4ff;
+  --jet-muted: rgba(200,215,255,.45);
+}
+
+/* Fundo geral */
+html, body { background: var(--jet-bg) !important; }
+
+/* ── SIDEBAR ─────────────────────────────── */
+#sidebar {
+  background: linear-gradient(180deg, #0c1423 0%, #080e1a 100%) !important;
+  border-right: 1px solid var(--jet-border) !important;
+  width: 320px !important;
+  min-width: 320px !important;
+}
+#sidebar.collapsed { width: 52px !important; min-width: 52px !important; }
+
+/* Header do sidebar */
+#sidebarHeader {
+  padding: 12px 12px 10px !important;
+  border-bottom: 1px solid var(--jet-border) !important;
+  background: rgba(48,127,226,.06) !important;
+}
+
+/* Brand */
+#brand { gap: 2px !important; }
+#brand .sub {
+  font-size: 10px !important;
+  color: var(--jet-muted) !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+/* Botão collapse */
+#btnCollapse {
+  background: var(--jet-blue-dim) !important;
+  border-color: var(--jet-blue-border) !important;
+  border-radius: 10px !important;
+  padding: 7px 9px !important;
+  font-size: 13px !important;
+  color: #60a5fa !important;
+}
+
+/* ── PANEL CARDS ─────────────────────────── */
+.panelCard {
+  background: var(--jet-card) !important;
+  border: 1px solid var(--jet-border) !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-bottom: 8px !important;
+  box-shadow: none !important;
+}
+.panelTitle {
+  font-size: 10px !important;
+  letter-spacing: .12em !important;
+  color: var(--jet-muted) !important;
+  margin-bottom: 8px !important;
+}
+.fieldLabel {
+  font-size: 11px !important;
+  color: var(--jet-muted) !important;
+  margin-bottom: 5px !important;
+}
+
+/* ── FILTROS COMPACTOS ───────────────────── */
+.cp-tipo-card {
+  padding: 7px 4px !important;
+  border-radius: 8px !important;
+  border-width: 1px !important;
+}
+.cp-tipo-icon {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+}
+.cp-tipo-icon svg { width: 14px !important; height: 14px !important; }
+.cp-tipo-name { font-size: 10px !important; margin-top: 3px !important; }
+
+/* Grid de filtros — 3 colunas mais compactas */
+.cp-tipo-grid { gap: 5px !important; }
+
+/* Selected com cor JET */
+.cp-tipo-card.selected,
+.cp-tipo-card.flt-toggle.selected {
+  border-color: var(--jet-blue-border) !important;
+  background: var(--jet-blue-dim) !important;
+}
+
+/* ── INPUTS ──────────────────────────────── */
+select, input[type="text"], input[type="number"] {
+  background: rgba(255,255,255,.05) !important;
+  border: 1px solid var(--jet-border) !important;
+  border-radius: 10px !important;
+  color: var(--jet-fg) !important;
+  font-size: 13px !important;
+  padding: 9px 11px !important;
+}
+input:focus, select:focus {
+  border-color: var(--jet-blue-border) !important;
+  outline: none !important;
+}
+
+/* ── BOTÕES PRIMÁRIOS ────────────────────── */
+#btnImportarMassa {
+  background: var(--jet-blue-dim) !important;
+  border: 1px solid var(--jet-blue-border) !important;
+  color: #93c5fd !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+}
+#btnGestaoPoligonos {
+  background: var(--jet-blue-dim) !important;
+  border: 1px solid var(--jet-blue-border) !important;
+  color: #93c5fd !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+}
+
+/* ── FAB CADASTRAR ───────────────────────── */
+#fabCadastrar {
+  width: 58px !important;
+  height: 58px !important;
+  background: linear-gradient(135deg, #1a6fd4, #307FE2) !important;
+  box-shadow: 0 4px 20px rgba(48,127,226,.6) !important;
+}
+
+/* ── MONITOR BTNS ────────────────────────── */
+.flt-monitor-btn {
+  font-size: 11px !important;
+  padding: 6px 4px !important;
+  border-radius: 7px !important;
+}
+
+/* ── MOBILE ──────────────────────────────── */
+@media (max-width: 768px) {
+  body.mobile #sidebar {
+    background: linear-gradient(180deg, #0c1423 0%, #080e1a 100%) !important;
+    border-top: 1px solid var(--jet-border) !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+
+  body.mobile #sheetHandle {
+    background: rgba(48,127,226,.35) !important;
+    width: 36px !important;
+    height: 4px !important;
+    border-radius: 99px !important;
+  }
+
+  body.mobile #sidebarHeader {
+    padding: 14px 14px 10px !important;
+  }
+
+  /* Filtros em 2 cols no mobile */
+  body.mobile .cp-tipo-grid {
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 6px !important;
+  }
+
+  body.mobile .cp-tipo-card {
+    padding: 10px 4px !important;
+  }
+  body.mobile .cp-tipo-icon {
+    width: 30px !important;
+    height: 30px !important;
+  }
+  body.mobile .cp-tipo-icon svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  body.mobile .cp-tipo-name {
+    font-size: 11px !important;
+  }
+
+  /* Inputs maiores no mobile */
+  body.mobile input[type="text"],
+  body.mobile input[type="number"],
+  body.mobile select {
+    font-size: 16px !important;
+    min-height: 48px !important;
+    padding: 12px 14px !important;
+  }
+
+  body.mobile .fieldLabel {
+    font-size: 13px !important;
+  }
+
+  body.mobile .panelTitle {
+    font-size: 11px !important;
+  }
+
+  /* FABs maiores no mobile */
+  body.mobile .map-fab-ctrl {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 14px !important;
+  }
+  body.mobile .map-fab-ctrl svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+  body.mobile #fabCadastrar {
+    width: 62px !important;
+    height: 62px !important;
+  }
+  body.mobile #fabCadastrar svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Botões de ação mobile */
+  body.mobile #btnImportarMassa,
+  body.mobile #btnGestaoPoligonos {
+    min-height: 50px !important;
+    font-size: 14px !important;
+  }
+
+  /* Monitor btns mobile */
+  body.mobile .flt-monitor-btn {
+    min-height: 44px !important;
+    font-size: 13px !important;
+  }
+}
+/* ═══════════════════════════════════════════ */
 </style>
 </head>
 <body>
