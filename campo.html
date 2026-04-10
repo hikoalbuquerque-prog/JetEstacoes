@@ -4109,11 +4109,7 @@ input:focus, select:focus {
 
     if (lblBaseCount) lblBaseCount.textContent = String(estacoes.length);
 
-    // Pre-geocodificar todas as cidades antes do primeiro render
-    // Garante que os pins ficam no lugar certo desde o inicio
-    preGeocodeTodasCidades_(function() {
-      safeRenderRequest_(true);
-    });
+    safeRenderRequest_(true);
   }
 
   /* ===============================
@@ -4775,8 +4771,8 @@ input:focus, select:focus {
 
       const labelTxt = SHOW_CITY_COUNT ? `${cidade} · ${lista.length}` : `${cidade}`;
 
-      // Usar geocode cacheado se disponivel, senao centroide como fallback
-      const posInicial = _cidadeGeocodeCache[cidade] || centro;
+      // Centroide filtrado por bounding box do pais
+      const posInicial = calcularCentroCidadeFiltrado_(lista) || centro;
       const marker = new google.maps.Marker({
         position: posInicial,
         map,
@@ -4809,12 +4805,7 @@ input:focus, select:focus {
         safeRenderRequest_(true);
       });
 
-      // Geocode assincrono — so dispara se nao tiver no cache
-      if (!_cidadeGeocodeCache[cidade]) {
-        (function(m, cid, est) {
-          geocodeCidadeParaMarker_(m, cid, est);
-        })(marker, cidade, lista);
-      }
+      // geocode externo removido
 
       markersCidade.push(marker);
     });
@@ -8609,6 +8600,53 @@ if ('serviceWorker' in navigator) {
 
 
 
+
+
+// ── CENTROIDE FILTRADO POR BOUNDING BOX DO PAIS ──────────────────
+// Ignora estacoes que estao fora do bounding box esperado do pais
+// Evita que estacoes cadastradas com pais errado distorcam o pin
+
+var BBOX_PAIS = {
+  'BR': { minLat: -33.8, maxLat:  5.3, minLng: -73.9, maxLng: -28.6 },
+  'MX': { minLat:  14.5, maxLat: 32.7, minLng:-117.1, maxLng: -86.7 },
+  'AR': { minLat: -55.0, maxLat: -21.8, minLng: -73.6, maxLng: -53.6 },
+  'CL': { minLat: -55.9, maxLat: -17.5, minLng: -75.6, maxLng: -66.4 },
+  'CO': { minLat:  -4.2, maxLat:  12.5, minLng: -79.0, maxLng: -66.9 }
+};
+
+function calcularCentroCidadeFiltrado_(lista) {
+  if (!lista || !lista.length) return null;
+
+  // Detectar pais pela maioria das estacoes
+  var contPais = {};
+  lista.forEach(function(e) {
+    var p = (e.pais || 'BR').toString().toUpperCase().trim();
+    if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') p = 'MX';
+    else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
+    contPais[p] = (contPais[p] || 0) + 1;
+  });
+  var paisDom = 'BR';
+  var maxCount = 0;
+  Object.keys(contPais).forEach(function(p) {
+    if (contPais[p] > maxCount) { maxCount = contPais[p]; paisDom = p; }
+  });
+
+  var bbox = BBOX_PAIS[paisDom];
+  if (!bbox) return null;
+
+  // Filtrar apenas estacoes dentro do bbox do pais dominante
+  var filtradas = lista.filter(function(e) {
+    var lat = Number(e.lat), lng = Number(e.lng);
+    return lat >= bbox.minLat && lat <= bbox.maxLat &&
+           lng >= bbox.minLng && lng <= bbox.maxLng;
+  });
+
+  if (!filtradas.length) return null;
+
+  var sumLat = 0, sumLng = 0;
+  filtradas.forEach(function(e) { sumLat += Number(e.lat); sumLng += Number(e.lng); });
+  return { lat: sumLat / filtradas.length, lng: sumLng / filtradas.length };
+}
 
 // ── PRE-GEOCODE DE CIDADES ────────────────────────────────────────
 // Geocodifica todas as cidades de uma vez antes do primeiro render
