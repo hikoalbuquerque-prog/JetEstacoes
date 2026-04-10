@@ -4816,26 +4816,26 @@ input:focus, select:focus {
 
     // Filtrar estacoes pelo bbox do pais para evitar distorcao
     var listaFiltrada = lista;
-    if (typeof BBOX_PAIS !== 'undefined' && typeof calcularCentroCidadeFiltrado_ === 'function') {
-      var contPais = {};
+    if (typeof BBOX_PAIS !== 'undefined') {
+      var contPais2 = {};
       lista.forEach(function(e) {
         var p = (e.pais || 'BR').toString().toUpperCase().trim();
         if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') p = 'MX';
         else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
-        contPais[p] = (contPais[p] || 0) + 1;
+        contPais2[p] = (contPais2[p] || 0) + 1;
       });
-      var paisDom = 'BR', maxC = 0;
-      Object.keys(contPais).forEach(function(p) {
-        if (contPais[p] > maxC) { maxC = contPais[p]; paisDom = p; }
+      var paisDom2 = 'BR', maxC2 = 0;
+      Object.keys(contPais2).forEach(function(p) {
+        if (contPais2[p] > maxC2) { maxC2 = contPais2[p]; paisDom2 = p; }
       });
-      var bbox = BBOX_PAIS[paisDom];
-      if (bbox) {
-        var tmp = lista.filter(function(e) {
+      var bbox2 = BBOX_PAIS[paisDom2];
+      if (bbox2) {
+        var tmp2 = lista.filter(function(e) {
           var la = Number(e.lat), ln = Number(e.lng);
-          return la >= bbox.minLat && la <= bbox.maxLat &&
-                 ln >= bbox.minLng && ln <= bbox.maxLng;
+          return la >= bbox2.minLat && la <= bbox2.maxLat &&
+                 ln >= bbox2.minLng && ln <= bbox2.maxLng;
         });
-        if (tmp.length) listaFiltrada = tmp;
+        if (tmp2.length) listaFiltrada = tmp2;
       }
     }
 
@@ -8627,9 +8627,9 @@ if ('serviceWorker' in navigator) {
 
 
 
-// ── CENTROIDE FILTRADO POR BOUNDING BOX DO PAIS ──────────────────
-// Ignora estacoes que estao fora do bounding box esperado do pais
-// Evita que estacoes cadastradas com pais errado distorcam o pin
+// ── CENTROIDE ROBUSTO (MEDIANA) ──────────────────────────────────
+// Usa mediana em vez de media -- resistente a outliers
+// Uma estacao no lugar errado nao distorce o pin da cidade
 
 var BBOX_PAIS = {
   'BR': { minLat: -33.8, maxLat:  5.3, minLng: -73.9, maxLng: -28.6 },
@@ -8639,10 +8639,17 @@ var BBOX_PAIS = {
   'CO': { minLat:  -4.2, maxLat:  12.5, minLng: -79.0, maxLng: -66.9 }
 };
 
+function mediana_(arr) {
+  if (!arr.length) return 0;
+  var s = arr.slice().sort(function(a,b){ return a-b; });
+  var m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+}
+
 function calcularCentroCidadeFiltrado_(lista) {
   if (!lista || !lista.length) return null;
 
-  // Detectar pais pela maioria das estacoes
+  // Passo 1: detectar pais dominante
   var contPais = {};
   lista.forEach(function(e) {
     var p = (e.pais || 'BR').toString().toUpperCase().trim();
@@ -8650,27 +8657,26 @@ function calcularCentroCidadeFiltrado_(lista) {
     else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
     contPais[p] = (contPais[p] || 0) + 1;
   });
-  var paisDom = 'BR';
-  var maxCount = 0;
+  var paisDom = 'BR', maxC = 0;
   Object.keys(contPais).forEach(function(p) {
-    if (contPais[p] > maxCount) { maxCount = contPais[p]; paisDom = p; }
+    if (contPais[p] > maxC) { maxC = contPais[p]; paisDom = p; }
   });
 
+  // Passo 2: filtrar pelo bbox do pais dominante
   var bbox = BBOX_PAIS[paisDom];
-  if (!bbox) return null;
+  var filtradas = bbox ? lista.filter(function(e) {
+    var la = Number(e.lat), ln = Number(e.lng);
+    return la >= bbox.minLat && la <= bbox.maxLat &&
+           ln >= bbox.minLng && ln <= bbox.maxLng;
+  }) : lista;
 
-  // Filtrar apenas estacoes dentro do bbox do pais dominante
-  var filtradas = lista.filter(function(e) {
-    var lat = Number(e.lat), lng = Number(e.lng);
-    return lat >= bbox.minLat && lat <= bbox.maxLat &&
-           lng >= bbox.minLng && lng <= bbox.maxLng;
-  });
+  if (!filtradas.length) filtradas = lista;
 
-  if (!filtradas.length) return null;
+  // Passo 3: mediana das coordenadas (resistente a outliers)
+  var lats = filtradas.map(function(e){ return Number(e.lat); });
+  var lngs = filtradas.map(function(e){ return Number(e.lng); });
 
-  var sumLat = 0, sumLng = 0;
-  filtradas.forEach(function(e) { sumLat += Number(e.lat); sumLng += Number(e.lng); });
-  return { lat: sumLat / filtradas.length, lng: sumLng / filtradas.length };
+  return { lat: mediana_(lats), lng: mediana_(lngs) };
 }
 
 // ── PRE-GEOCODE DE CIDADES ────────────────────────────────────────
