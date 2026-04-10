@@ -4806,7 +4806,7 @@ input:focus, select:focus {
       marker.addListener('click', () => {
         entrouPorCidade = true;
         elCidade.value = cidade;
-        fitBoundsCidade(lista);
+        fitBoundsCidade(filtrarCoordsValidas_(lista));
         safeRenderRequest_(true);
       });
 
@@ -4835,10 +4835,7 @@ input:focus, select:focus {
              Math.abs(ln - medLng) <= TOLERANCIA;
     });
     if (!listaFiltrada.length) listaFiltrada = listaValida;
-    // Fallback adicional: se ainda vazio, usar lista toda
-    if (listaFiltrada.length < Math.max(1, Math.floor(lista.length * 0.5))) {
-      listaFiltrada = lista;
-    }
+    // Sem fallback para lista com inteiras -- listaValida ja e o maximo seguro
 
     const bounds = new google.maps.LatLngBounds();
     let n = 0;
@@ -5418,7 +5415,7 @@ input:focus, select:focus {
     if (btnCentralizar) btnCentralizar.addEventListener('click', () => {
       if (!map) return;
       if (elCidade?.value && estacoesPorCidade[elCidade.value]?.length) {
-        fitBoundsCidade(estacoesPorCidade[elCidade.value]);
+        fitBoundsCidade(filtrarCoordsValidas_(estacoesPorCidade[elCidade.value]||[]));
       } else {
         map.setCenter({ lat: -14.235, lng: -51.925 });
         map.setZoom(5);
@@ -5435,7 +5432,7 @@ input:focus, select:focus {
     window._fabCentralizar = function() {
       if (!map) return;
       if (elCidade && elCidade.value && estacoesPorCidade[elCidade.value] && estacoesPorCidade[elCidade.value].length) {
-        fitBoundsCidade(estacoesPorCidade[elCidade.value]);
+        fitBoundsCidade(filtrarCoordsValidas_(estacoesPorCidade[elCidade.value]||[]));
       } else {
         map.setCenter({ lat: -14.235, lng: -51.925 });
         map.setZoom(5);
@@ -5478,13 +5475,13 @@ input:focus, select:focus {
           const ok = await ensureCityLoadedMobile_(elCidade.value);
           if (ok && Array.isArray(estacoes) && estacoes.length) {
             entrouPorCidade = true;
-            try { fitBoundsCidade(estacoes); } catch(e){}
+            try { fitBoundsCidade(filtrarCoordsValidas_(estacoes)); } catch(e){}
           }
         } else {
           const lista = estacoesPorCidade[elCidade.value];
           if (lista && lista.length) {
             entrouPorCidade = true;
-            fitBoundsCidade(lista);
+            fitBoundsCidade(filtrarCoordsValidas_(lista));
           }
         }
       }
