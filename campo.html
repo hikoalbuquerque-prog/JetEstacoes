@@ -4814,30 +4814,18 @@ input:focus, select:focus {
   function fitBoundsCidade(lista) {
     if (!lista || !lista.length) return;
 
-    // Filtrar estacoes pelo bbox do pais para evitar distorcao
-    var listaFiltrada = lista;
-    if (typeof BBOX_PAIS !== 'undefined') {
-      var contPais2 = {};
-      lista.forEach(function(e) {
-        var p = (e.pais || 'BR').toString().toUpperCase().trim();
-        if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') p = 'MX';
-        else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
-        contPais2[p] = (contPais2[p] || 0) + 1;
-      });
-      var paisDom2 = 'BR', maxC2 = 0;
-      Object.keys(contPais2).forEach(function(p) {
-        if (contPais2[p] > maxC2) { maxC2 = contPais2[p]; paisDom2 = p; }
-      });
-      var bbox2 = BBOX_PAIS[paisDom2];
-      if (bbox2) {
-        var tmp2 = lista.filter(function(e) {
-          var la = Number(e.lat), ln = Number(e.lng);
-          return la >= bbox2.minLat && la <= bbox2.maxLat &&
-                 ln >= bbox2.minLng && ln <= bbox2.maxLng;
-        });
-        if (tmp2.length) listaFiltrada = tmp2;
-      }
-    }
+    // Usar mediana para calcular bounds -- ignora outliers extremos
+    var latsF = lista.map(function(e){ return Number(e.lat); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
+    var lngsF = lista.map(function(e){ return Number(e.lng); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
+    var medLat = latsF[Math.floor(latsF.length/2)] || 0;
+    var medLng = lngsF[Math.floor(lngsF.length/2)] || 0;
+    // Incluir apenas estacoes dentro de 1 grau da mediana (~110km)
+    var TOLERANCIA = 1.5;
+    var listaFiltrada = lista.filter(function(e) {
+      return Math.abs(Number(e.lat) - medLat) <= TOLERANCIA &&
+             Math.abs(Number(e.lng) - medLng) <= TOLERANCIA;
+    });
+    if (!listaFiltrada.length) listaFiltrada = lista;
 
     const bounds = new google.maps.LatLngBounds();
     let n = 0;
@@ -8627,9 +8615,9 @@ if ('serviceWorker' in navigator) {
 
 
 
-// ── CENTROIDE ROBUSTO (MEDIANA) ──────────────────────────────────
-// Usa mediana em vez de media -- resistente a outliers
-// Uma estacao no lugar errado nao distorce o pin da cidade
+// ── CENTROIDE ROBUSTO (MEDIANA PURA) ─────────────────────────────
+// Mediana e resistente a outliers sem precisar de bbox
+// 1 estacao errada em 50 nao afeta o resultado
 
 var BBOX_PAIS = {
   'BR': { minLat: -33.8, maxLat:  5.3, minLng: -73.9, maxLng: -28.6 },
@@ -8649,33 +8637,17 @@ function mediana_(arr) {
 function calcularCentroCidadeFiltrado_(lista) {
   if (!lista || !lista.length) return null;
 
-  // Passo 1: detectar pais dominante
-  var contPais = {};
+  var lats = [], lngs = [];
   lista.forEach(function(e) {
-    var p = (e.pais || 'BR').toString().toUpperCase().trim();
-    if (p === 'MX' || p === 'MEXICO' || p === 'MÉXICO') p = 'MX';
-    else if (p !== 'AR' && p !== 'CL' && p !== 'CO') p = 'BR';
-    contPais[p] = (contPais[p] || 0) + 1;
-  });
-  var paisDom = 'BR', maxC = 0;
-  Object.keys(contPais).forEach(function(p) {
-    if (contPais[p] > maxC) { maxC = contPais[p]; paisDom = p; }
-  });
-
-  // Passo 2: filtrar pelo bbox do pais dominante
-  var bbox = BBOX_PAIS[paisDom];
-  var filtradas = bbox ? lista.filter(function(e) {
     var la = Number(e.lat), ln = Number(e.lng);
-    return la >= bbox.minLat && la <= bbox.maxLat &&
-           ln >= bbox.minLng && ln <= bbox.maxLng;
-  }) : lista;
+    if (isFinite(la) && isFinite(ln) &&
+        Math.abs(la) <= 90 && Math.abs(ln) <= 180) {
+      lats.push(la);
+      lngs.push(ln);
+    }
+  });
 
-  if (!filtradas.length) filtradas = lista;
-
-  // Passo 3: mediana das coordenadas (resistente a outliers)
-  var lats = filtradas.map(function(e){ return Number(e.lat); });
-  var lngs = filtradas.map(function(e){ return Number(e.lng); });
-
+  if (!lats.length) return null;
   return { lat: mediana_(lats), lng: mediana_(lngs) };
 }
 
