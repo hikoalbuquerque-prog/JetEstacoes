@@ -4819,21 +4819,22 @@ input:focus, select:focus {
   function fitBoundsCidade(lista) {
     if (!lista || !lista.length) return;
 
-    // Usar mediana para calcular bounds -- ignora outliers extremos
-    var latsF = lista.map(function(e){ return Number(e.lat); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
-    var lngsF = lista.map(function(e){ return Number(e.lng); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
+    // Filtrar coords inteiras antes de calcular bounds
+    var listaValida = filtrarCoordsValidas_(lista);
+    var latsF = listaValida.map(function(e){ return typeof parseCoord_==='function'?parseCoord_(e.lat):Number(e.lat); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
+    var lngsF = listaValida.map(function(e){ return typeof parseCoord_==='function'?parseCoord_(e.lng):Number(e.lng); }).filter(function(v){ return isFinite(v); }).sort(function(a,b){return a-b;});
     var medLat = latsF[Math.floor(latsF.length/2)] || 0;
     var medLng = lngsF[Math.floor(lngsF.length/2)] || 0;
     // Incluir estacoes dentro de 3 graus da mediana (~330km)
     // Fallback: se filtrou menos de 30% da lista, usar completa
     var TOLERANCIA = 3.0;
-    var listaFiltrada = lista.filter(function(e) {
-      return Math.abs(Number(e.lat) - medLat) <= TOLERANCIA &&
-             Math.abs(Number(e.lng) - medLng) <= TOLERANCIA;
+    var listaFiltrada = listaValida.filter(function(e) {
+      var la = typeof parseCoord_==='function'?parseCoord_(e.lat):Number(e.lat);
+      var ln = typeof parseCoord_==='function'?parseCoord_(e.lng):Number(e.lng);
+      return Math.abs(la - medLat) <= TOLERANCIA &&
+             Math.abs(ln - medLng) <= TOLERANCIA;
     });
-    if (!listaFiltrada.length || listaFiltrada.length < lista.length * 0.3) {
-      listaFiltrada = lista;
-    }
+    if (!listaFiltrada.length) listaFiltrada = listaValida;
     // Fallback adicional: se ainda vazio, usar lista toda
     if (listaFiltrada.length < Math.max(1, Math.floor(lista.length * 0.5))) {
       listaFiltrada = lista;
@@ -4842,10 +4843,10 @@ input:focus, select:focus {
     const bounds = new google.maps.LatLngBounds();
     let n = 0;
 
-    listaFiltrada.forEach(e => {
-      const la = parseCoord_(e?.lat);
-      const ln = parseCoord_(e?.lng);
-      if (la == null || ln == null) return;
+    listaFiltrada.forEach(function(e) {
+      var la = typeof parseCoord_==='function' ? parseCoord_(e.lat) : Number(e.lat);
+      var ln = typeof parseCoord_==='function' ? parseCoord_(e.lng) : Number(e.lng);
+      if (la == null || ln == null || !isFinite(la) || !isFinite(ln)) return;
       bounds.extend({ lat: la, lng: ln });
       n++;
     });
@@ -8637,6 +8638,17 @@ function detectarPaisPorCoords_(lat, lng) {
   if (la >= -55.9 && la <= -17.5 && ln >= -75.6 && ln <= -66.4) return 'CL';
   if (la >= -4.2  && la <= 12.5  && ln >= -79.0 && ln <= -66.9) return 'CO';
   return 'BR';
+}
+
+
+// ── FILTRAR ESTACOES COM COORDS VALIDAS (nao inteiras) ───────────
+function filtrarCoordsValidas_(lista) {
+  var filtradas = lista.filter(function(e) {
+    var laStr = String(e.lat || '');
+    var lnStr = String(e.lng || '');
+    return laStr.indexOf('.') !== -1 || laStr.indexOf(',') !== -1;
+  });
+  return filtradas.length ? filtradas : lista;
 }
 
 // ── CENTROIDE ROBUSTO (MEDIANA PURA) ─────────────────────────────
