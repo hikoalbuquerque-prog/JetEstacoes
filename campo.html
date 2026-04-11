@@ -6223,6 +6223,44 @@ setInterval(() => {
 var CAMPO = { BACKEND_URL: 'https://script.google.com/macros/s/AKfycbzPM0lN2w5wS4fT9jtUGkWSkfiw5cDSt6x7khxxiHa46ag98rrYxJEGoJ1-iU950Q84/exec' };
 
 /* ── _gasRun: transporta chamadas GAS tanto dentro do iframe quanto no GitHub Pages ── */
+
+// ── _gasRunPost: para payloads grandes (imagens base64) ──────────
+function _gasRunPost(fn, payload, onSuccess, onFailure) {
+  if (window.google && window.google.script && window.google.script.run) {
+    var runner = window.google.script.run
+      .withSuccessHandler(onSuccess || function(){})
+      .withFailureHandler(onFailure || function(e){ console.error('GAS erro:', fn, e); });
+    if (payload !== undefined) { runner[fn](payload); } else { runner[fn](); }
+    return;
+  }
+  // GitHub Pages: GET com payload reduzido (1 imagem)
+  var payloadRed = payload;
+  if (payload && payload.imagens && payload.imagens.length > 1) {
+    payloadRed = { imagens: [payload.imagens[0]] };
+  }
+  var url = CAMPO.BACKEND_URL + '?action=' + encodeURIComponent(fn)
+    + '&d=' + encodeURIComponent(JSON.stringify(payloadRed !== undefined ? payloadRed : {}));
+  fetch(url, { method: 'GET', redirect: 'follow' })
+    .then(function(r) {
+      if (r.type === 'opaque' || r.type === 'opaqueredirect') {
+        if (onFailure) onFailure(new Error('Resposta opaca'));
+        return null;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function(text) {
+      if (!text) return;
+      var res;
+      try { res = JSON.parse(text); } catch(e) {
+        if (onFailure) onFailure(new Error('Resposta invalida'));
+        return;
+      }
+      if (onSuccess) onSuccess(res);
+    })
+    .catch(function(e) { if (onFailure) onFailure(e); });
+}
+
 function _gasRun(fn, payload, onSuccess, onFailure) {
   // Dentro do GAS iframe: usar google.script.run diretamente
   if (window.google && window.google.script && window.google.script.run) {
@@ -9244,7 +9282,7 @@ function _vrrScorePOIs(lat, lng) {
 // ── Analise de calcada via GAS + Claude ──────────────
 function _vrrScoreCalcada(lat, lng) {
   return new Promise(function(resolve) {
-    _gasRun('analisarCalcadaIA', { lat: lat, lng: lng },
+    _gasRunPost('analisarCalcadaIA', { lat: lat, lng: lng },
       function(resp) {
         if (!resp || !resp.ok || !resp.imagens || !resp.imagens.length) {
           resolve({ score: 0, aprovado: null, obs: 'Sem Street View' });
@@ -9261,7 +9299,7 @@ function _vrrScoreCalcada(lat, lng) {
           content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
         });
 
-        _gasRun('analisarCalcadaComGemini', { imagens: resp.imagens },
+        _gasRunPost('analisarCalcadaComGemini', { imagens: resp.imagens },
           function(res) {
             if (!res || !res.ok || !res.resultado) {
               resolve({ score: 0, aprovado: null, obs: res && res.error ? res.error : 'Erro Gemini' });
