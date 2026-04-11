@@ -9282,39 +9282,19 @@ function _vrrScorePOIs(lat, lng) {
 // ── Analise de calcada via GAS + Claude ──────────────
 function _vrrScoreCalcada(lat, lng) {
   return new Promise(function(resolve) {
-    _gasRunPost('analisarCalcadaIA', { lat: lat, lng: lng },
-      function(resp) {
-        if (!resp || !resp.ok || !resp.imagens || !resp.imagens.length) {
-          resolve({ score: 0, aprovado: null, obs: 'Sem Street View' });
+    _gasRun('analisarCalcadaIA', { lat: lat, lng: lng },
+      function(res) {
+        if (!res || !res.ok || !res.resultado) {
+          resolve({ score: 0, aprovado: null, obs: res && res.error ? res.error : 'Sem Street View' });
           return;
         }
-
-        var content = [{
-          type: 'text',
-          text: 'Analise a calcada nestas ' + resp.imagens.length + ' imagens de Street View. '
-            + 'Avalie: (1) largura livre >= 2.8m, (2) obstaculos, (3) qualidade do piso. '
-            + 'Retorne APENAS JSON: {"aprovado":true/false,"largura":"X metros","obs":"texto curto","score":0-40}'
-        }];
-        resp.imagens.forEach(function(b64) {
-          content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
+        var r = res.resultado;
+        resolve({
+          score: Math.min(40, Math.max(0, Number(r.score) || 0)),
+          aprovado: r.aprovado,
+          obs: r.observacoes || '',
+          largura: r.larguraEstimada || ''
         });
-
-        _gasRunPost('analisarCalcadaComGemini', { imagens: resp.imagens },
-          function(res) {
-            if (!res || !res.ok || !res.resultado) {
-              resolve({ score: 0, aprovado: null, obs: res && res.error ? res.error : 'Erro Gemini' });
-              return;
-            }
-            var r = res.resultado;
-            resolve({
-              score: Math.min(40, Math.max(0, Number(r.score) || 0)),
-              aprovado: r.aprovado,
-              obs: r.observacoes || '',
-              largura: r.larguraEstimada || ''
-            });
-          },
-          function(){ resolve({ score: 0, aprovado: null, obs: 'Erro GAS' }); }
-        );
       },
       function(){ resolve({ score: 0, aprovado: null, obs: 'Erro GAS' }); }
     );
@@ -9870,32 +9850,20 @@ function mlpAnalisarIA() {
   var lat = _mlpItem.lat;
   var lng = _mlpItem.lng;
 
-  // Passo 1: buscar Street View via GAS (sem restricao de referrer)
+  // GAS faz tudo: Street View + Gemini server-side
+  // Browser so envia lat/lng
   _gasRun('analisarCalcadaIA', { lat: lat, lng: lng },
-    function(resp) {
-      if (!resp || !resp.ok || !resp.imagens || !resp.imagens.length) {
+    function(res) {
+      if (!res || !res.ok) {
         _exibirResultadoIA_({
           aprovado: null,
           larguraEstimada: 'N/A',
-          observacoes: (resp && resp.error) ? resp.error : 'Street View nao disponivel neste local',
+          observacoes: (res && res.error) ? res.error : 'Erro na analise',
           confianca: 'baixa'
         });
         return;
       }
-
-      // Passo 2: enviar imagens ao Gemini via GAS (sem CORS)
-      _gasRun('analisarCalcadaComGemini', { imagens: resp.imagens },
-        function(res) {
-          if (!res || !res.ok) {
-            _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: res && res.error ? res.error : 'Erro Gemini', confianca: 'baixa' });
-            return;
-          }
-          _exibirResultadoIA_(res.resultado);
-        },
-        function(e) {
-          _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro GAS: ' + String(e), confianca: 'baixa' });
-        }
-      );
+      _exibirResultadoIA_(res.resultado);
     },
     function(err) {
       _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro GAS: ' + String(err), confianca: 'baixa' });
