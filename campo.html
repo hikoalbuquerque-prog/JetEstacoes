@@ -6191,6 +6191,7 @@ setInterval(() => {
 (function(){
   var key='MAPS_KEY_VALUE';
   function loadMaps(k) {
+    window._MAPS_KEY = k;
     var s=document.createElement('script');
     s.src='https://maps.googleapis.com/maps/api/js?key='+k+'&callback=initMap&libraries=geometry,places,drawing';
     s.async=true;document.head.appendChild(s);
@@ -6746,9 +6747,9 @@ function cReverseGeocodePin(lat, lng) {
       if (el) { el.textContent = CS.endereco || '--'; el.style.color = 'rgba(255,255,255,.85)'; }
       var elB = document.getElementById('cPanelBairro');
       if (elB) elB.textContent = [CS.bairro, CS.cidade].filter(Boolean).join(' / ') || '--';
-    })
-    .withFailureHandler(function(){})
-    .reverseGeocodePWA({ lat: lat, lng: lng });
+    },
+    function() {}
+  );
 }
 
 /* ---- BUSCA MANUAL ---- */
@@ -9255,26 +9256,59 @@ function _vrrScoreCobertura(lat, lng) {
 }
 
 // ── Score de POIs (Overpass) ─────────────────────────
+var _overpassCache = {};
+var _overpassRateLimit = false;
+
 function _vrrScorePOIs(lat, lng) {
   return new Promise(function(resolve) {
+    // Se rate-limited, retorna score neutro imediatamente
+    if (_overpassRateLimit) { resolve({ score: 15, count: 0, cached: true }); return; }
+
+    // Cache por grade (arredonda 3 casas decimais ~111m)
+    var cacheKey = lat.toFixed(3) + ',' + lng.toFixed(3);
+    if (_overpassCache[cacheKey]) { resolve(_overpassCache[cacheKey]); return; }
+
     var query = '[out:json][timeout:8];('
-      + 'node["amenity"~"restaurant|cafe|gym|school|bank"](around:150,' + lat + ',' + lng + ');'
-      + 'node["tourism"~"hotel"](around:150,' + lat + ',' + lng + ');'
-      + 'node["shop"~"mall|supermarket"](around:150,' + lat + ',' + lng + ');'
+      + 'node["amenity"~"restaurant|cafe|gym|school|bank"](around:200,' + lat + ',' + lng + ');'
+      + 'node["tourism"~"hotel"](around:200,' + lat + ',' + lng + ');'
+      + 'node["shop"~"mall|supermarket"](around:200,' + lat + ',' + lng + ');'
       + ');out count;';
 
-    fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query))
-      .then(function(r) { return r.text(); })
-      .then(function(text) {
-        if (!text || text.trim().length === 0) { resolve({ score: 10, count: 0 }); return; }
-        var data;
-        try { data = JSON.parse(text); } catch(e) { resolve({ score: 10, count: 0 }); return; }
-        var count = (data.elements && data.elements[0] && data.elements[0].tags && data.elements[0].tags.total)
-          ? Number(data.elements[0].tags.total) : 0;
-        var score = count === 0 ? 0 : count <= 2 ? 15 : count <= 5 ? 22 : 30;
-        resolve({ score: score, count: count });
-      })
-      .catch(function(){ resolve({ score: 10, count: 0 }); });
+    // Tentar overpass turbo primeiro, fallback kumi
+    var urls = [
+      'https://overpass-api.de/api/interpreter?data=',
+      'https://overpass.kumi.systems/api/interpreter?data='
+    ];
+    var tried = 0;
+
+    function tryUrl(idx) {
+      if (idx >= urls.length) { resolve({ score: 15, count: 0 }); return; }
+      fetch(urls[idx] + encodeURIComponent(query))
+        .then(function(r) {
+          if (r.status === 429) {
+            // Rate limit -- marcar por 30s e usar score neutro
+            _overpassRateLimit = true;
+            setTimeout(function(){ _overpassRateLimit = false; }, 30000);
+            tryUrl(idx + 1);
+            return null;
+          }
+          return r.text();
+        })
+        .then(function(text) {
+          if (!text) return;
+          var data;
+          try { data = JSON.parse(text); } catch(e) { resolve({ score: 10, count: 0 }); return; }
+          var count = (data.elements && data.elements[0] && data.elements[0].tags && data.elements[0].tags.total)
+            ? Number(data.elements[0].tags.total) : 0;
+          var score = count === 0 ? 5 : count <= 2 ? 15 : count <= 5 ? 22 : 30;
+          var result = { score: score, count: count };
+          _overpassCache[cacheKey] = result;
+          resolve(result);
+        })
+        .catch(function(){ tryUrl(idx + 1); });
+    }
+
+    tryUrl(0);
   });
 }
 
@@ -9433,14 +9467,23 @@ function _vrrLimparHeat() {
 // ── Item na lista ─────────────────────────────────────
 function _vrrAdicionarItemLista(r) {
   var lista = document.getElementById('vrrLista');
-  var cor   = r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#ef4444';
-  var badge = r.score >= 70 ? 'OTIMO' : r.score >= 40 ? 'POSSIVEL' : 'RUIM';
+  var cor     = r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#ef4444';
+  var badge   = r.score >= 70 ? 'OTIMO' : r.score >= 40 ? 'POSSIVEL' : 'RUIM';
   var bgBadge = r.score >= 70 ? 'rgba(16,185,129,.15)' : r.score >= 40 ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.15)';
+
+  // Thumbnail Street View (200x80) via Maps Static API
+  var mapsKey = window._MAPS_KEY || window.MAPS_KEY || '';
+  var svThumb = mapsKey
+    ? '<img src="https://maps.googleapis.com/maps/api/streetview?size=280x90&location='
+        + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
+        + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" '
+        + 'onerror="this.style.display='none'">'
+    : '';
 
   var div = document.createElement('div');
   div.className = 'vrr-item';
   div.dataset.score = r.score;
-  div.innerHTML = ''
+  div.innerHTML = svThumb
     + '<div style="display:flex;align-items:center;justify-content:space-between">'
     +   '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>'
     +   '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + '">' + badge + '</span>'
@@ -9453,8 +9496,8 @@ function _vrrAdicionarItemLista(r) {
     + '</div>'
     + (r.calcadaObs ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">' + r.calcadaObs + '</div>' : '')
     + '<div style="margin-top:6px;display:flex;gap:6px">'
-    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6)">Ver</button>'
-    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;cursor:pointer;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#10b981">+ Add</button>' : '')
+    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;border:none;background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">Ver</button>'
+    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;border:none;background:' + cor + ';color:white;font-size:11px;font-weight:700;cursor:pointer">+ Add</button>' : '')
     + '</div>';
 
   lista.appendChild(div);
