@@ -9421,7 +9421,7 @@ function _vrrAdicionarHeatMarker(r) {
     zIndex: 200
   });
   marker.addListener('click', function(){
-    _vrrAbrirDetalhe(r);
+    _vrrAdicionarPonto(r.lat, r.lng);
   });
   _vrrHeatMarkers.push(marker);
 }
