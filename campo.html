@@ -9632,11 +9632,8 @@ function _vrrAbrirFoto(img) {
 var _vrrFeedbacks = [];
 function _vrrRecusar(btn, lat, lng) {
   var motivos = ['Pista de onibus', 'Area gramada', 'Sem calcada', 'Calcada estreita', 'Obstruido', 'Outro'];
-  var motivo = window.prompt('Motivo da recusa (ajuda a melhorar a IA):
-' + motivos.map(function(m,i){ return (i+1)+'. '+m; }).join('
-') + '
-
-Digite o numero ou descreva:');
+  var lista = motivos.map(function(m, i){ return (i+1) + '. ' + m; }).join('\n');
+  var motivo = window.prompt('Motivo da recusa (ajuda a melhorar a IA):\n' + lista + '\n\nDigite o numero ou descreva:');
   if (!motivo) return;
   var motivoTexto = motivos[Number(motivo)-1] || motivo;
   _vrrFeedbacks.push({ lat: lat, lng: lng, motivo: motivoTexto, ts: Date.now() });
