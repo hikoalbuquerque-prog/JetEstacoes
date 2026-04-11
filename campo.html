@@ -2564,6 +2564,13 @@ input:focus, select:focus {
   <div id="vrrLista" style="flex:1;overflow-y:auto;padding:8px 0"></div>
 
   <!-- Footer -->
+  <!-- Barra de selecao em lote -->
+  <div id="vrrLoteBar" style="display:none;padding:8px 12px;background:rgba(37,99,235,.12);border-top:1px solid rgba(37,99,235,.25);flex-shrink:0">
+    <div style="font-size:11px;color:#60a5fa;font-weight:700;margin-bottom:6px" id="vrrLoteCnt">0 selecionados</div>
+    <button onclick="_vrrAdicionarLote()" style="width:100%;padding:8px;border-radius:7px;border:none;background:#2563eb;color:white;font-size:11px;font-weight:700;cursor:pointer">
+      Adicionar selecionados em lote
+    </button>
+  </div>
   <div id="vrrFooter" style="display:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0">
     <button onclick="vrrAdicionarAprovados()" style="
       width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;
@@ -2571,6 +2578,38 @@ input:focus, select:focus {
       background:linear-gradient(135deg,#059669,#10b981);color:white">
       + Adicionar todos os Otimos em lote
     </button>
+  </div>
+</div>
+
+<!-- Modal confirmacao lote varredura -->
+<div id="vrrLoteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:90000;background:rgba(0,0,0,.7);align-items:center;justify-content:center">
+  <div style="background:#0d1830;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px;width:300px;max-width:90vw">
+    <div style="font-size:14px;font-weight:700;color:white;margin-bottom:16px">Adicionar em lote</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:8px">Estas configuracoes valem para todos os selecionados:</div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:rgba(255,255,255,.6);display:block;margin-bottom:4px">Tipo</label>
+      <select id="vrrLoteTipo" style="width:100%;padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:#1a2540;color:white;font-size:12px">
+        <option value="PUBLICA">Publica</option>
+        <option value="PRIVADA">Privada</option>
+        <option value="CONCORRENTE">Concorrente</option>
+      </select>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:11px;color:rgba(255,255,255,.6);display:block;margin-bottom:4px">Modalidade</label>
+      <select id="vrrLoteMod" style="width:100%;padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:#1a2540;color:white;font-size:12px">
+        <option value="PATINETE">Patinete</option>
+        <option value="BIKE">Bike</option>
+        <option value="HIBRIDA">Hibrida</option>
+      </select>
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;color:rgba(255,255,255,.6);display:block;margin-bottom:4px">Observacao (opcional)</label>
+      <input id="vrrLoteObs" type="text" placeholder="Ex: area comercial, alta demanda..." style="width:100%;padding:8px;border-radius:7px;border:1px solid rgba(255,255,255,.15);background:#1a2540;color:white;font-size:12px;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('vrrLoteModal').style.display='none'" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-size:12px;cursor:pointer">Cancelar</button>
+      <button onclick="_vrrConfirmarLote()" style="flex:1;padding:10px;border-radius:8px;border:none;background:#2563eb;color:white;font-size:12px;font-weight:700;cursor:pointer">Confirmar</button>
+    </div>
   </div>
 </div>
 
@@ -9160,9 +9199,18 @@ function fecharVarredura() {
   if (!painel) return;
   painel.style.transform = 'translateX(100%)';
   setTimeout(function(){ painel.style.display = 'none'; }, 300);
-  _vrrLimparHeat();
-  if (_vrrCircle) { _vrrCircle.setMap(null); _vrrCircle = null; }
+  // NAO limpa heat markers -- ficam visiveis no mapa para referencia
+  // Limpa apenas se iniciar nova varredura
   _vrrParar = true;
+}
+
+function abrirVarredura() {
+  var painel = document.getElementById('painelVarredura');
+  if (!painel) return;
+  painel.style.display = 'flex';
+  painel.style.flexDirection = 'column';
+  setTimeout(function(){ painel.style.transform = 'translateX(0)'; }, 10);
+  vrrModoRaio();
 }
 
 // ── Modos de selecao de area ─────────────────────────
@@ -9378,7 +9426,28 @@ function iniciarVarredura() {
   var step    = Number(document.getElementById('vrrGridStep').value) || 250;
   var pontos  = _vrrGerarGrid(centro, raio, step);
 
-  document.getElementById('vrrProgressoDetalhe').textContent = pontos.length + ' pontos no grid';
+  // Filtrar pontos com estacao existente ou ja adicionada nesta sessao a < 100m
+  var estList = window.estacoes || [];
+  var jaAdicionados = window._vrrJaAdicionados || [];
+  pontos = pontos.filter(function(p) {
+    var ptLatLng = new google.maps.LatLng(p.lat, p.lng);
+    // Checar estacoes existentes
+    for (var i = 0; i < estList.length; i++) {
+      var la = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lat) : Number(estList[i].lat);
+      var ln = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lng) : Number(estList[i].lng);
+      if (!isFinite(la) || !isFinite(ln)) continue;
+      var d = google.maps.geometry.spherical.computeDistanceBetween(ptLatLng, new google.maps.LatLng(la, ln));
+      if (d < 100) return false;
+    }
+    // Checar adicionados nesta sessao
+    for (var j = 0; j < jaAdicionados.length; j++) {
+      var d2 = google.maps.geometry.spherical.computeDistanceBetween(ptLatLng, new google.maps.LatLng(jaAdicionados[j].lat, jaAdicionados[j].lng));
+      if (d2 < 100) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('vrrProgressoDetalhe').textContent = pontos.length + ' pontos no grid (filtrados)';
 
   // Processar em serie para nao sobrecarregar GAS
   _vrrProcessarFila(pontos, 0, pontos.length);
@@ -9496,33 +9565,45 @@ function _vrrAdicionarItemLista(r) {
   var badge   = r.score >= 70 ? 'OTIMO' : r.score >= 40 ? 'POSSIVEL' : 'RUIM';
   var bgBadge = r.score >= 70 ? 'rgba(16,185,129,.15)' : r.score >= 40 ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.15)';
 
-  // Thumbnail Street View (200x80) via Maps Static API
+  // Thumbnail Street View clicavel para fullscreen
   var mapsKey = window._MAPS_KEY || window.MAPS_KEY || '';
-  var svThumb = mapsKey
-    ? '<img src="https://maps.googleapis.com/maps/api/streetview?size=280x90&location='
-        + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
-        + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" '
-        + ' onerror="this.remove()">'  
+  var svUrl = mapsKey
+    ? 'https://maps.googleapis.com/maps/api/streetview?size=280x120&location=' + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
     : '';
+  var svThumb = svUrl
+    ? '<img src="' + svUrl + '" data-fullsrc="' + svUrl.replace('280x120','800x400') + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
+    : '';
+
+  // Filtrar obs de erro generico
+  var obsCalcada = r.calcadaObs || '';
+  if (obsCalcada === 'Coords invalidas' || obsCalcada === 'Erro GAS') obsCalcada = '';
+  if (obsCalcada === 'Sem Street View') obsCalcada = 'Sem imagem disponivel neste local';
+
+  // ID unico para checkbox
+  var itemId = 'vrr_' + Math.random().toString(36).substr(2,8);
 
   var div = document.createElement('div');
   div.className = 'vrr-item';
   div.dataset.score = r.score;
+  div.dataset.lat = r.lat;
+  div.dataset.lng = r.lng;
   div.innerHTML = svThumb
-    + '<div style="display:flex;align-items:center;justify-content:space-between">'
+    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+    +   '<input type="checkbox" id="' + itemId + '" style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">'
     +   '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>'
-    +   '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + '">' + badge + '</span>'
+    +   '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + ';margin-left:auto">' + badge + '</span>'
     + '</div>'
     + '<div class="vrr-score-bar" style="background:' + cor + ';width:' + r.score + '%"></div>'
-    + '<div style="display:flex;gap:8px;margin-top:6px">'
-    +   '<span style="font-size:10px;color:rgba(255,255,255,.4)">Calcada: ' + r.scoreCalcada + '/40</span>'
-    +   '<span style="font-size:10px;color:rgba(255,255,255,.4)">POIs: ' + r.scorePOI + '/30</span>'
-    +   '<span style="font-size:10px;color:rgba(255,255,255,.4)">Cobertura: ' + r.scoreCobertura + '/30</span>'
+    + '<div style="display:flex;gap:6px;margin-top:5px">'
+    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">Calcada: ' + r.scoreCalcada + '/40</span>'
+    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">POIs: ' + r.scorePOI + '/30</span>'
+    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">Dist: ' + r.scoreCobertura + '/30</span>'
     + '</div>'
-    + (r.calcadaObs ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">' + r.calcadaObs + '</div>' : '')
-    + '<div style="margin-top:6px;display:flex;gap:6px">'
-    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;border:none;background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);font-size:11px;cursor:pointer">Ver</button>'
-    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;border:none;background:' + cor + ';color:white;font-size:11px;font-weight:700;cursor:pointer">+ Add</button>' : '')
+    + (obsCalcada ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px;font-style:italic">' + obsCalcada + '</div>' : '')
+    + '<div style="margin-top:6px;display:flex;gap:4px">'
+    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:4px 2px;border-radius:6px;border:none;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-size:10px;cursor:pointer">Ver</button>'
+    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:4px 2px;border-radius:6px;border:none;background:' + cor + ';color:white;font-size:10px;font-weight:700;cursor:pointer">+ Add</button>' : '')
+    +   '<button onclick="_vrrRecusar(this,' + r.lat + ',' + r.lng + ')" title="Recusar - dar feedback" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(239,68,68,.3);background:transparent;color:rgba(239,68,68,.6);font-size:10px;cursor:pointer">x</button>'
     + '</div>';
 
   lista.appendChild(div);
@@ -9534,7 +9615,91 @@ function _vrrCentralizar(lat, lng) {
   _gmap.setZoom(17);
 }
 
+// Abrir foto fullscreen
+function _vrrAbrirFoto(img) {
+  var src = img.dataset.fullsrc || img.src;
+  var overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:99999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  overlay.onclick = function(){ document.body.removeChild(overlay); };
+  var big = document.createElement('img');
+  big.src = src;
+  big.style.cssText = 'max-width:95%;max-height:90vh;border-radius:10px;box-shadow:0 4px 32px rgba(0,0,0,.8)';
+  overlay.appendChild(big);
+  document.body.appendChild(overlay);
+}
+
+// Recusar ponto e registrar feedback para melhorar IA
+var _vrrFeedbacks = [];
+function _vrrRecusar(btn, lat, lng) {
+  var motivos = ['Pista de onibus', 'Area gramada', 'Sem calcada', 'Calcada estreita', 'Obstruido', 'Outro'];
+  var motivo = window.prompt('Motivo da recusa (ajuda a melhorar a IA):
+' + motivos.map(function(m,i){ return (i+1)+'. '+m; }).join('
+') + '
+
+Digite o numero ou descreva:');
+  if (!motivo) return;
+  var motivoTexto = motivos[Number(motivo)-1] || motivo;
+  _vrrFeedbacks.push({ lat: lat, lng: lng, motivo: motivoTexto, ts: Date.now() });
+  // Remover da lista visualmente
+  var item = btn.closest('.vrr-item');
+  if (item) {
+    item.style.opacity = '0.3';
+    item.style.pointerEvents = 'none';
+    item.style.textDecoration = 'line-through';
+  }
+  // Remover heat marker correspondente
+  _vrrHeatMarkers.forEach(function(m) {
+    var pos = m.getPosition();
+    if (pos && Math.abs(pos.lat()-lat) < 0.0001 && Math.abs(pos.lng()-lng) < 0.0001) {
+      m.setMap(null);
+    }
+  });
+  cToast('Feedback registrado: ' + motivoTexto, 'info');
+}
+
+// Selecao em lote
+var _vrrSelecao = [];
+function _vrrAtualizarLote() {
+  var checks = document.querySelectorAll('.vrr-item input[type=checkbox]:checked');
+  _vrrSelecao = Array.from(checks).map(function(c) {
+    var item = c.closest('.vrr-item');
+    return { lat: Number(item.dataset.lat), lng: Number(item.dataset.lng) };
+  });
+  var bar = document.getElementById('vrrLoteBar');
+  if (bar) {
+    bar.style.display = _vrrSelecao.length > 0 ? 'block' : 'none';
+    var cnt = document.getElementById('vrrLoteCnt');
+    if (cnt) cnt.textContent = _vrrSelecao.length + ' selecionados';
+  }
+}
+
+function _vrrAdicionarLote() {
+  if (!_vrrSelecao.length) return;
+  // Abrir modal de confirmacao de lote
+  var modal = document.getElementById('vrrLoteModal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function _vrrConfirmarLote() {
+  var modal = document.getElementById('vrrLoteModal');
+  if (modal) modal.style.display = 'none';
+  var tipo = document.getElementById('vrrLoteTipo') ? document.getElementById('vrrLoteTipo').value : 'PUBLICA';
+  var mod  = document.getElementById('vrrLoteMod')  ? document.getElementById('vrrLoteMod').value  : 'PATINETE';
+  var count = 0;
+  window._vrrJaAdicionados = window._vrrJaAdicionados || [];
+  _vrrSelecao.forEach(function(p) {
+    window._vrrJaAdicionados.push(p);
+    count++;
+  });
+  cToast(count + ' pontos marcados como ' + tipo + ' / ' + mod + '. Salve individualmente no campo.', 'success');
+  _vrrSelecao = [];
+  _vrrAtualizarLote();
+}
+
 function _vrrAdicionarPonto(lat, lng) {
+  // Registrar como ja adicionado para nao repetir na proxima varredura
+  window._vrrJaAdicionados = window._vrrJaAdicionados || [];
+  window._vrrJaAdicionados.push({ lat: lat, lng: lng });
   fecharVarredura();
   var latLng = new google.maps.LatLng(lat, lng);
   cOpenDrawer();
