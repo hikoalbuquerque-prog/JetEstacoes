@@ -9220,17 +9220,11 @@ function _vrrScoreCobertura(lat, lng) {
 // ── Score de POIs (Overpass) ─────────────────────────
 function _vrrScorePOIs(lat, lng) {
   return new Promise(function(resolve) {
-    var query = '[out:json][timeout:8];
-(
-'
-      + 'node["amenity"~"restaurant|cafe|gym|school|bank"](around:150,' + lat + ',' + lng + ');
-'
-      + 'node["tourism"~"hotel"](around:150,' + lat + ',' + lng + ');
-'
-      + 'node["shop"~"mall|supermarket"](around:150,' + lat + ',' + lng + ');
-'
-      + ');
-out count;';
+    var query = '[out:json][timeout:8];('
+      + 'node["amenity"~"restaurant|cafe|gym|school|bank"](around:150,' + lat + ',' + lng + ');'
+      + 'node["tourism"~"hotel"](around:150,' + lat + ',' + lng + ');'
+      + 'node["shop"~"mall|supermarket"](around:150,' + lat + ',' + lng + ');'
+      + ');out count;';
 
     fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query))
       .then(function(r){ return r.json(); })
