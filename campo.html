@@ -2515,6 +2515,31 @@ input:focus, select:focus {
           <option value="400">Grid amplo 400m</option>
         </select>
       </div>
+
+      <!-- Espacamento minimo entre estacoes -->
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <span style="font-size:11px;color:rgba(255,255,255,.4);flex:1">Dist. minima</span>
+        <select id="vrrDistMin" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:white;padding:4px 6px;font-size:11px">
+          <option value="50">50m</option>
+          <option value="100" selected>100m</option>
+          <option value="150">150m</option>
+          <option value="200">200m</option>
+          <option value="300">300m</option>
+          <option value="500">500m</option>
+        </select>
+      </div>
+
+      <!-- Modo preencher furos -->
+      <div style="margin-top:8px;padding:8px;background:rgba(48,127,226,.08);border:1px solid rgba(48,127,226,.2);border-radius:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="vrrModoFuros" style="accent-color:#307FE2;width:14px;height:14px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#60a5fa">Preencher Furos</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">So analisa areas sem cobertura</div>
+          </div>
+        </label>
+        <div id="vrrFurosInfo" style="display:none;margin-top:6px;font-size:10px;color:rgba(255,255,255,.4)"></div>
+      </div>
     </div>
 
     <!-- Botao iniciar -->
@@ -9291,18 +9316,35 @@ function _vrrDesenharCirculo() {
 // ── Gerar grid de pontos dentro da area ──────────────
 // ── Filtrar pontos removendo os com estacao a < 100m ────────────
 function _vrrFiltrarPontos(pontos) {
+  var distMin = window._vrrDistMin || 100;
   var estList = window.estacoes || [];
   var jaAdicionados = window._vrrJaAdicionados || [];
-  return pontos.filter(function(p) {
+  var aprovados = window._vrrAprovados || [];
+  // Deduplicar candidatos entre si (evita analisar dois pontos muito proximos)
+  var dedup = [];
+  pontos.forEach(function(p) {
     var pt = new google.maps.LatLng(p.lat, p.lng);
+    var muitoPerto = dedup.some(function(d) {
+      return google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(d.lat, d.lng)) < distMin * 0.6;
+    });
+    if (!muitoPerto) dedup.push(p);
+  });
+  return dedup.filter(function(p) {
+    var pt = new google.maps.LatLng(p.lat, p.lng);
+    // Estacoes existentes
     for (var i = 0; i < estList.length; i++) {
       var la = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lat) : Number(estList[i].lat);
       var ln = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lng) : Number(estList[i].lng);
       if (!isFinite(la) || !isFinite(ln)) continue;
-      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(la, ln)) < 100) return false;
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(la, ln)) < distMin) return false;
     }
+    // Ja adicionados nesta sessao
     for (var j = 0; j < jaAdicionados.length; j++) {
-      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(jaAdicionados[j].lat, jaAdicionados[j].lng)) < 100) return false;
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(jaAdicionados[j].lat, jaAdicionados[j].lng)) < distMin) return false;
+    }
+    // Ja aprovados nesta sessao
+    for (var k = 0; k < aprovados.length; k++) {
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(aprovados[k].lat, aprovados[k].lng)) < distMin) return false;
     }
     return true;
   });
@@ -9556,26 +9598,56 @@ function iniciarVarredura() {
   document.getElementById('vrrLista').innerHTML = '';
   document.getElementById('vrrBtnIniciar').disabled = true;
 
-  var centro = _gmap.getCenter();
-  var raio   = Number(document.getElementById('vrrRaioSlider').value) || 500;
-  var modo   = document.getElementById('vrrGridStep').value;
+  var centro   = _gmap.getCenter();
+  var raio     = Number(document.getElementById('vrrRaioSlider').value) || 500;
+  var modo     = document.getElementById('vrrGridStep').value;
+  var distMin  = Number(document.getElementById('vrrDistMin').value) || 100;
+  var modoFuros = document.getElementById('vrrModoFuros').checked;
+
+  // Guardar distMin globalmente para uso no filtro
+  window._vrrDistMin = distMin;
 
   document.getElementById('vrrProgressoDetalhe').textContent = 'Buscando candidatos...';
 
-  if (modo === 'osm') {
-    // Buscar candidatos reais do OpenStreetMap via Overpass
-    _vrrBuscarCandidatosOSM(centro, raio, function(pontos) {
-      var filtrados = _vrrFiltrarPontos(pontos);
-      document.getElementById('vrrProgressoDetalhe').textContent = filtrados.length + ' candidatos OSM filtrados';
-      _vrrProcessarFila(filtrados, 0, filtrados.length);
-    });
-  } else {
-    // Grid matematico como fallback
-    var step = Number(modo) || 250;
-    var pontos = _vrrGerarGrid(centro, raio, step);
+  function _processarComFuros(pontos) {
     var filtrados = _vrrFiltrarPontos(pontos);
-    document.getElementById('vrrProgressoDetalhe').textContent = filtrados.length + ' pontos no grid (filtrados)';
+
+    if (modoFuros) {
+      // No modo furos: so analisa pontos que estejam em "buraco" de cobertura
+      // Buraco = ponto sem nenhuma estacao existente OU aprovada a menos de distMin * 2
+      var limFuro = distMin * 2;
+      var aprovados = window._vrrAprovados || [];
+      filtrados = filtrados.filter(function(p) {
+        var pt = new google.maps.LatLng(p.lat, p.lng);
+        var estList = window.estacoes || [];
+        var temEstacao = estList.some(function(e) {
+          var la = typeof parseCoord_ === 'function' ? parseCoord_(e.lat) : Number(e.lat);
+          var ln = typeof parseCoord_ === 'function' ? parseCoord_(e.lng) : Number(e.lng);
+          if (!isFinite(la) || !isFinite(ln)) return false;
+          return google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(la, ln)) < limFuro;
+        });
+        if (temEstacao) return false;
+        var temAprovado = aprovados.some(function(a) {
+          return google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(a.lat, a.lng)) < limFuro;
+        });
+        return !temAprovado;
+      });
+      var infoEl = document.getElementById('vrrFurosInfo');
+      if (infoEl) {
+        infoEl.style.display = 'block';
+        infoEl.textContent = filtrados.length + ' furos encontrados (raio furo: ' + limFuro + 'm)';
+      }
+    }
+
+    document.getElementById('vrrProgressoDetalhe').textContent = filtrados.length + ' candidatos' + (modoFuros ? ' (furos)' : '');
     _vrrProcessarFila(filtrados, 0, filtrados.length);
+  }
+
+  if (modo === 'osm') {
+    _vrrBuscarCandidatosOSM(centro, raio, _processarComFuros);
+  } else {
+    var step = Number(modo) || 250;
+    _processarComFuros(_vrrGerarGrid(centro, raio, step));
   }
 }
 
@@ -9666,7 +9738,7 @@ function _vrrAdicionarHeatMarker(r) {
       path: google.maps.SymbolPath.CIRCLE,
       scale: 10,
       fillColor: cor,
-      fillOpacity: 0.8,
+      fillOpacity: 0.85,
       strokeColor: '#fff',
       strokeWeight: 1.5
     },
@@ -9676,7 +9748,32 @@ function _vrrAdicionarHeatMarker(r) {
   marker.addListener('click', function(){
     _vrrAdicionarPonto(r.lat, r.lng);
   });
+  r.__marker = marker; // referencia direta para remover sem loop
   _vrrHeatMarkers.push(marker);
+}
+
+// Marcadores de aprovados (pin verde estrela -- persistem apos fechar painel)
+var _vrrAprovadosMarkers = [];
+
+function _vrrMarcarAprovado(lat, lng, label) {
+  var gmap = window._gmap;
+  if (!gmap) return;
+  var m = new google.maps.Marker({
+    position: { lat: lat, lng: lng },
+    map: gmap,
+    icon: {
+      path: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+      fillColor: '#10b981',
+      fillOpacity: 1,
+      strokeColor: '#fff',
+      strokeWeight: 1.5,
+      scale: 1.2,
+      anchor: new google.maps.Point(12, 12)
+    },
+    title: 'Aprovado: ' + (label || 'Novo ponto'),
+    zIndex: 500
+  });
+  _vrrAprovadosMarkers.push(m);
 }
 
 function _vrrLimparHeat() {
@@ -9770,13 +9867,18 @@ function _vrrRecusar(btn, lat, lng) {
     item.style.pointerEvents = 'none';
     item.style.textDecoration = 'line-through';
   }
-  // Remover heat marker correspondente
-  _vrrHeatMarkers.forEach(function(m) {
+  // Remover heat marker correspondente + do array
+  _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
     var pos = m.getPosition();
     if (pos && Math.abs(pos.lat()-lat) < 0.0001 && Math.abs(pos.lng()-lng) < 0.0001) {
       m.setMap(null);
+      return false;
     }
+    return true;
   });
+  // Registrar como recusado para nao reaparecer em proxima varredura
+  window._vrrJaAdicionados = window._vrrJaAdicionados || [];
+  window._vrrJaAdicionados.push({ lat: lat, lng: lng, recusado: true });
   cToast('Feedback registrado: ' + motivoTexto, 'info');
 }
 
@@ -9820,9 +9922,21 @@ function _vrrConfirmarLote() {
 }
 
 function _vrrAdicionarPonto(lat, lng) {
-  // Registrar como ja adicionado para nao repetir na proxima varredura
+  // Registrar como aprovado -- exibe pin estrela e nao repete em proxima varredura
   window._vrrJaAdicionados = window._vrrJaAdicionados || [];
   window._vrrJaAdicionados.push({ lat: lat, lng: lng });
+  window._vrrAprovados = window._vrrAprovados || [];
+  window._vrrAprovados.push({ lat: lat, lng: lng });
+  _vrrMarcarAprovado(lat, lng);
+  // Remover heat marker do ponto aprovado (pin estrela substitui)
+  _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
+    var pos = m.getPosition();
+    if (pos && Math.abs(pos.lat()-lat) < 0.0001 && Math.abs(pos.lng()-lng) < 0.0001) {
+      m.setMap(null);
+      return false;
+    }
+    return true;
+  });
   fecharVarredura();
   var latLng = new google.maps.LatLng(lat, lng);
   cOpenDrawer();
