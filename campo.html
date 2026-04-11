@@ -9261,26 +9261,22 @@ function _vrrScoreCalcada(lat, lng) {
           content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
         });
 
-        fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 200,
-            messages: [{ role: 'user', content: content }]
-          })
-        })
-        .then(function(r){ return r.json(); })
-        .then(function(data) {
-          var text = (data.content && data.content[0] && data.content[0].text) || '{}';
-          try {
-            var res = JSON.parse(text.replace(/```json|```/g,'').trim());
-            resolve({ score: Math.min(40, Math.max(0, Number(res.score) || 0)), aprovado: res.aprovado, obs: res.obs || '', largura: res.largura || '' });
-          } catch(e) {
-            resolve({ score: 0, aprovado: null, obs: 'Erro parse' });
-          }
-        })
-        .catch(function(){ resolve({ score: 0, aprovado: null, obs: 'Erro Claude' }); });
+        _gasRun('analisarCalcadaComGemini', { imagens: resp.imagens },
+          function(res) {
+            if (!res || !res.ok || !res.resultado) {
+              resolve({ score: 0, aprovado: null, obs: res && res.error ? res.error : 'Erro Gemini' });
+              return;
+            }
+            var r = res.resultado;
+            resolve({
+              score: Math.min(40, Math.max(0, Number(r.score) || 0)),
+              aprovado: r.aprovado,
+              obs: r.observacoes || '',
+              largura: r.larguraEstimada || ''
+            });
+          },
+          function(){ resolve({ score: 0, aprovado: null, obs: 'Erro GAS' }); }
+        );
       },
       function(){ resolve({ score: 0, aprovado: null, obs: 'Erro GAS' }); }
     );
@@ -9834,43 +9830,19 @@ function mlpAnalisarIA() {
         return;
       }
 
-      // Passo 2: enviar imagens ao Claude via Anthropic API
-      var content = [{
-        type: 'text',
-        text: 'Voce e um especialista em mobilidade urbana. Analise estas ' + resp.imagens.length + ' imagens de Street View do mesmo local em angulos diferentes. Avalie se a calcada tem faixa livre minima de 2.8 metros para instalacao de patinetes eletricos, considerando obstaculos como postes, arvores, lixeiras, barracas, grades, etc. Retorne APENAS um JSON valido sem markdown: {"aprovado": true, "larguraEstimada": "X metros", "observacoes": "texto curto descrevendo o local", "confianca": "alta"}'
-      }];
-
-      resp.imagens.forEach(function(b64) {
-        content.push({
-          type: 'image',
-          source: { type: 'base64', media_type: 'image/jpeg', data: b64 }
-        });
-      });
-
-      fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 400,
-          messages: [{ role: 'user', content: content }]
-        })
-      })
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
-        var text = (data.content && data.content[0] && data.content[0].text) || '{}';
-        var resultado;
-        try {
-          var clean = text.replace(/```json|```/g, '').trim();
-          resultado = JSON.parse(clean);
-        } catch(e) {
-          resultado = { aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro ao interpretar: ' + text.substring(0,80), confianca: 'baixa' };
+      // Passo 2: enviar imagens ao Gemini via GAS (sem CORS)
+      _gasRun('analisarCalcadaComGemini', { imagens: resp.imagens },
+        function(res) {
+          if (!res || !res.ok) {
+            _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: res && res.error ? res.error : 'Erro Gemini', confianca: 'baixa' });
+            return;
+          }
+          _exibirResultadoIA_(res.resultado);
+        },
+        function(e) {
+          _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro GAS: ' + String(e), confianca: 'baixa' });
         }
-        _exibirResultadoIA_(resultado);
-      })
-      .catch(function(e) {
-        _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro Claude API: ' + e.message, confianca: 'baixa' });
-      });
+      );
     },
     function(err) {
       _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro GAS: ' + String(err), confianca: 'baixa' });
