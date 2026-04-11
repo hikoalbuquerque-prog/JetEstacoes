@@ -5060,6 +5060,31 @@ input:focus, select:focus {
     if (elCidade?.value) hideActiveCity_(elCidade.value);
     hideActiveCity_(null);
 
+    // Funcoes locais de geo (precisam estar no escopo de initMap)
+    function mediana_(arr) {
+      if (!arr.length) return 0;
+      var s = arr.slice().sort(function(a,b){ return a-b; });
+      var m = Math.floor(s.length / 2);
+      return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2;
+    }
+    function calcularCentroCidadeFiltrado_(lista) {
+      if (!lista || !lista.length) return null;
+      var lats = [], lngs = [];
+      lista.forEach(function(e) {
+        var la = typeof parseCoord_ === 'function' ? parseCoord_(e.lat) : parseFloat(String(e.lat||'').replace(',','.'));
+        var ln = typeof parseCoord_ === 'function' ? parseCoord_(e.lng) : parseFloat(String(e.lng||'').replace(',','.'));
+        if (la == null) la = Number(e.lat);
+        if (ln == null) ln = Number(e.lng);
+        if (!isFinite(la) || !isFinite(ln)) return;
+        if (Math.abs(la) < 0.01 || Math.abs(ln) < 0.01) return;
+        if (Math.abs(la) > 90  || Math.abs(ln) > 180)  return;
+        if (la === Math.round(la) && ln === Math.round(ln)) return;
+        lats.push(la); lngs.push(ln);
+      });
+      if (!lats.length) return null;
+      return { lat: mediana_(lats), lng: mediana_(lngs) };
+    }
+
     clearClusters_();
 
     markersCidade.forEach(m => m.setMap(null));
@@ -9477,7 +9502,7 @@ function _vrrAdicionarItemLista(r) {
     ? '<img src="https://maps.googleapis.com/maps/api/streetview?size=280x90&location='
         + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
         + '" style="width:100%;height:80px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block" '
-        + 'onerror="this.style.display='none'">'
+        + ' onerror="this.remove()">'  
     : '';
 
   var div = document.createElement('div');
