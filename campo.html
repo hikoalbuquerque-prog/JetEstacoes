@@ -10019,15 +10019,126 @@ function _vrrAdicionarLote() {
 function _vrrConfirmarLote() {
   var modal = document.getElementById('vrrLoteModal');
   if (modal) modal.style.display = 'none';
-  var tipo = document.getElementById('vrrLoteTipo') ? document.getElementById('vrrLoteTipo').value : 'PUBLICA';
-  var mod  = document.getElementById('vrrLoteMod')  ? document.getElementById('vrrLoteMod').value  : 'PATINETE';
-  var count = 0;
-  window._vrrJaAdicionados = window._vrrJaAdicionados || [];
-  _vrrSelecao.forEach(function(p) {
-    window._vrrJaAdicionados.push(p);
-    count++;
-  });
-  cToast(count + ' pontos marcados como ' + tipo + ' / ' + mod + '. Salve individualmente no campo.', 'success');
+  if (!_vrrSelecao.length) return;
+
+  var tipo   = (document.getElementById('vrrLoteTipo') || {}).value || 'PUBLICA';
+  var mod    = (document.getElementById('vrrLoteMod')  || {}).value || 'PATINETE';
+  var obs    = (document.getElementById('vrrLoteObs')  || {}).value || '';
+  var total  = _vrrSelecao.length;
+  var pontos = _vrrSelecao.slice(); // copia
+
+  if (!CS.user) {
+    cToast('Faca login antes de adicionar em lote', 'error');
+    return;
+  }
+
+  cToast('Salvando ' + total + ' estacoes...', 'info');
+  var salvos = 0, erros = 0;
+
+  // Processar em serie para nao sobrecarregar o GAS
+  function _salvarProximo(idx) {
+    if (idx >= pontos.length) {
+      // Concluido
+      var msg = salvos + ' estacoes salvas';
+      if (erros) msg += ', ' + erros + ' erros';
+      cToast(msg, salvos > 0 ? 'success' : 'error');
+      if (salvos > 0 && window._refreshMapa) window._refreshMapa();
+      return;
+    }
+    var p = pontos[idx];
+    // Geocode reverso via GAS para obter endereco
+    _gasRun('reverseGeocodePWA', { lat: p.lat, lng: p.lng },
+      function(geoRes) {
+        var geo = (geoRes && geoRes.ok && geoRes.geo) || {};
+        var payload = {
+          email: CS.user.email || '',
+          lat: p.lat, lng: p.lng,
+          tipo: tipo,
+          modalidade: mod,
+          nomeConcorrente: '',
+          observacoes: obs || 'Adicionado em lote via Varredura IA',
+          status: 'SOLICITADO',
+          dimensoes: '', larguraFaixa: '',
+          geo: {
+            cidade:   geo.cidade   || '',
+            bairro:   geo.bairro   || '',
+            endereco: geo.endereco || '',
+            pais:     geo.pais     || 'BR'
+          },
+          operador: CS.user.email,
+          origem: 'PWA_CAMPO_LOTE',
+          foto: null
+        };
+        _gasRun('addEstacaoFromMapa', payload,
+          function(res) {
+            if (res && res.ok) {
+              salvos++;
+              // Adicionar ao mapa local imediatamente
+              window._vrrJaAdicionados = window._vrrJaAdicionados || [];
+              window._vrrJaAdicionados.push(p);
+              window._vrrAprovados = window._vrrAprovados || [];
+              window._vrrAprovados.push(p);
+              _vrrMarcarAprovado(p.lat, p.lng, tipo);
+              // Remover heat marker
+              _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
+                var pos = m.getPosition();
+                if (pos && Math.abs(pos.lat()-p.lat) < 0.0001 && Math.abs(pos.lng()-p.lng) < 0.0001) {
+                  m.setMap(null); return false;
+                }
+                return true;
+              });
+              // Adicionar ao array local de estacoes
+              if (window.estacoes && res.estacao) {
+                var est = res.estacao;
+                est.__id = est.codigo ? ('COD:' + est.codigo) : ('tmp-' + Date.now());
+                est.lat = est.lat || p.lat;
+                est.lng = est.lng || p.lng;
+                est.tipo = tipo;
+                est.modalidade = mod;
+                est.statusEstacao = 'SOLICITADO';
+                est.cidade = payload.geo.cidade;
+                est.bairro = payload.geo.bairro;
+                est.endereco = payload.geo.endereco;
+                if (window.estacoesPorCidade && est.cidade) {
+                  if (!window.estacoesPorCidade[est.cidade]) window.estacoesPorCidade[est.cidade] = [];
+                  window.estacoesPorCidade[est.cidade].push(est);
+                }
+                window.estacoes.push(est);
+                if (window._mapInvalidateCache) window._mapInvalidateCache();
+              }
+              // Marcar item da lista como salvo
+              document.querySelectorAll('.vrr-item').forEach(function(item) {
+                if (Math.abs(Number(item.dataset.lat)-p.lat) < 0.0001 && Math.abs(Number(item.dataset.lng)-p.lng) < 0.0001) {
+                  item.style.background = 'rgba(16,185,129,.12)';
+                  item.style.border = '1px solid rgba(16,185,129,.3)';
+                  item.style.borderRadius = '8px';
+                  var btnAdd = item.querySelector('button[onclick*="_vrrAdicionarPonto"]');
+                  if (btnAdd) { btnAdd.disabled = true; btnAdd.textContent = 'Salvo'; btnAdd.style.opacity = '0.5'; }
+                }
+              });
+            } else {
+              erros++;
+              console.warn('[lote] erro ponto', p.lat, p.lng, res && res.error);
+            }
+            // Proximo com pequeno delay
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+          },
+          function(e) {
+            erros++;
+            console.warn('[lote] GAS erro', e);
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+          }
+        );
+      },
+      function() {
+        // Geocode falhou -- tentar salvar sem endereco
+        erros++;
+        setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+      }
+    );
+  }
+
+  _salvarProximo(0);
   _vrrSelecao = [];
   _vrrAtualizarLote();
 }
