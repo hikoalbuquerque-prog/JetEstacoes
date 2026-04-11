@@ -2505,13 +2505,14 @@ input:focus, select:focus {
         <span id="vrrRaioLabel" style="font-size:12px;font-weight:700;color:#60a5fa;min-width:44px">500m</span>
       </div>
 
-      <!-- Grid density -->
+      <!-- Fonte de candidatos -->
       <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
-        <span style="font-size:11px;color:rgba(255,255,255,.4);flex:1">Densidade do grid</span>
-        <select id="vrrGridStep" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:white;font-size:11px;padding:4px 6px">
-          <option value="150">Alta (150m)</option>
-          <option value="250" selected>Media (250m)</option>
-          <option value="400">Baixa (400m)</option>
+        <span style="font-size:11px;color:rgba(255,255,255,.4);flex:1">Candidatos</span>
+        <select id="vrrGridStep" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:white;padding:4px 6px;font-size:11px">
+          <option value="osm">OSM (ruas reais)</option>
+          <option value="150">Grid denso 150m</option>
+          <option value="250">Grid medio 250m</option>
+          <option value="400">Grid amplo 400m</option>
         </select>
       </div>
     </div>
@@ -9199,8 +9200,12 @@ function fecharVarredura() {
   if (!painel) return;
   painel.style.transform = 'translateX(100%)';
   setTimeout(function(){ painel.style.display = 'none'; }, 300);
-  // NAO limpa heat markers -- ficam visiveis no mapa para referencia
-  // Limpa apenas se iniciar nova varredura
+  // Limpar pins OSM de referencia (sao contexto, nao resultados)
+  if (window._vrrOSMMarkers) {
+    window._vrrOSMMarkers.forEach(function(m){ m.setMap(null); });
+    window._vrrOSMMarkers = [];
+  }
+  // Heat markers ficam visiveis no mapa para referencia
   _vrrParar = true;
 }
 
@@ -9284,6 +9289,131 @@ function _vrrDesenharCirculo() {
 }
 
 // ── Gerar grid de pontos dentro da area ──────────────
+// ── Filtrar pontos removendo os com estacao a < 100m ────────────
+function _vrrFiltrarPontos(pontos) {
+  var estList = window.estacoes || [];
+  var jaAdicionados = window._vrrJaAdicionados || [];
+  return pontos.filter(function(p) {
+    var pt = new google.maps.LatLng(p.lat, p.lng);
+    for (var i = 0; i < estList.length; i++) {
+      var la = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lat) : Number(estList[i].lat);
+      var ln = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lng) : Number(estList[i].lng);
+      if (!isFinite(la) || !isFinite(ln)) continue;
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(la, ln)) < 100) return false;
+    }
+    for (var j = 0; j < jaAdicionados.length; j++) {
+      if (google.maps.geometry.spherical.computeDistanceBetween(pt, new google.maps.LatLng(jaAdicionados[j].lat, jaAdicionados[j].lng)) < 100) return false;
+    }
+    return true;
+  });
+}
+
+// ── Buscar candidatos reais via OSM Overpass ─────────────────────
+// Retorna nos de: calcadas, esquinas comerciais, entradas de comercio,
+// pontos de referencia, paradas de bus (com calcada lateral)
+function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
+  var lat = centro.lat();
+  var lng = centro.lng();
+
+  // Query Overpass: nos e ways relevantes para instalacao de patinete
+  // Prioridade: comercio (alta demanda), no de calcada, parada de bus com sidewalk
+  // Excluir: meio de pista, estacionamento, parque sem calcada
+  var query = '[out:json][timeout:15];('
+    // Comercios e servicos -- alta demanda de patinetes
+    + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["shop"~"mall|supermarket|convenience|bakery|clothes|electronics"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["office"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Transporte -- intermodal
+    + 'node["highway"="bus_stop"]["shelter"="yes"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["railway"~"subway_entrance|station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Intersecoes de calcada -- bons pontos de fluxo
+    + 'node["highway"="crossing"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["highway"="street_lamp"]["sidewalk"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Pontos de interesse turistico/lazer
+    + 'node["tourism"~"attraction|museum|gallery"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["leisure"~"park|fitness_station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + ');out center 120;';
+
+  var urls = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+  ];
+
+  function tryUrl(idx) {
+    if (idx >= urls.length) {
+      cToast('OSM indisponivel, usando grid matematico', 'warn');
+      // Fallback para grid 250m
+      callback(_vrrGerarGrid(centro, raioMetros, 250));
+      return;
+    }
+    fetch(urls[idx] + '?data=' + encodeURIComponent(query))
+      .then(function(r) {
+        if (r.status === 429) { tryUrl(idx + 1); return null; }
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data) return;
+        var pontos = [];
+        var vistos = {};
+        (data.elements || []).forEach(function(el) {
+          var lat2 = el.lat || (el.center && el.center.lat);
+          var lng2 = el.lon || (el.center && el.center.lon);
+          if (!lat2 || !lng2) return;
+          // Deduplicar por grade de ~30m
+          var chave = lat2.toFixed(4) + ',' + lng2.toFixed(4);
+          if (vistos[chave]) return;
+          vistos[chave] = true;
+          // Calcular score de prioridade pelo tipo de no
+          var tags = el.tags || {};
+          var prioridade = 0;
+          if (tags.amenity && /restaurant|cafe|bank|pharmacy/.test(tags.amenity)) prioridade = 3;
+          else if (tags.shop || tags.office) prioridade = 3;
+          else if (tags.railway) prioridade = 4; // metro = altissima prioridade
+          else if (tags.amenity === 'bus_stop') prioridade = 2;
+          else if (tags.highway === 'crossing') prioridade = 1;
+          else prioridade = 1;
+          pontos.push({ lat: lat2, lng: lng2, prioridade: prioridade, tags: tags });
+        });
+        // Ordenar por prioridade desc -- analisar os mais importantes primeiro
+        pontos.sort(function(a, b) { return b.prioridade - a.prioridade; });
+        // Limitar a 60 pontos para nao sobrecarregar GAS
+        if (pontos.length > 60) pontos = pontos.slice(0, 60);
+        // Mostrar pins OSM no mapa como referencia visual
+        _vrrMostrarPinsOSM(pontos);
+        callback(pontos);
+      })
+      .catch(function() { tryUrl(idx + 1); });
+  }
+  tryUrl(0);
+}
+
+// Mostrar pins OSM no mapa como contexto visual (azul pequeno)
+var _vrrOSMMarkers = [];
+function _vrrMostrarPinsOSM(pontos) {
+  _vrrOSMMarkers.forEach(function(m) { m.setMap(null); });
+  _vrrOSMMarkers = [];
+  var gmap = window._gmap;
+  if (!gmap) return;
+  pontos.forEach(function(p) {
+    var m = new google.maps.Marker({
+      position: { lat: p.lat, lng: p.lng },
+      map: gmap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 4,
+        fillColor: '#60a5fa',
+        fillOpacity: 0.5,
+        strokeColor: '#3b82f6',
+        strokeWeight: 1
+      },
+      title: (p.tags && (p.tags.name || p.tags.amenity || p.tags.shop || p.tags.highway)) || 'Candidato OSM',
+      zIndex: 100,
+      clickable: false
+    });
+    _vrrOSMMarkers.push(m);
+  });
+}
+
 function _vrrGerarGrid(centro, raioMetros, stepMetros) {
   var pontos = [];
   var R = 6371000;
@@ -9414,6 +9544,11 @@ function iniciarVarredura() {
   _vrrAtivo = true;
   _vrrResultados = [];
   _vrrLimparHeat();
+  // Limpar pins OSM da varredura anterior
+  if (window._vrrOSMMarkers) {
+    window._vrrOSMMarkers.forEach(function(m){ m.setMap(null); });
+    window._vrrOSMMarkers = [];
+  }
 
   document.getElementById('vrrProgresso').style.display = 'block';
   document.getElementById('vrrResumo').style.display = 'none';
@@ -9421,36 +9556,27 @@ function iniciarVarredura() {
   document.getElementById('vrrLista').innerHTML = '';
   document.getElementById('vrrBtnIniciar').disabled = true;
 
-  var centro  = _gmap.getCenter();
-  var raio    = Number(document.getElementById('vrrRaioSlider').value) || 500;
-  var step    = Number(document.getElementById('vrrGridStep').value) || 250;
-  var pontos  = _vrrGerarGrid(centro, raio, step);
+  var centro = _gmap.getCenter();
+  var raio   = Number(document.getElementById('vrrRaioSlider').value) || 500;
+  var modo   = document.getElementById('vrrGridStep').value;
 
-  // Filtrar pontos com estacao existente ou ja adicionada nesta sessao a < 100m
-  var estList = window.estacoes || [];
-  var jaAdicionados = window._vrrJaAdicionados || [];
-  pontos = pontos.filter(function(p) {
-    var ptLatLng = new google.maps.LatLng(p.lat, p.lng);
-    // Checar estacoes existentes
-    for (var i = 0; i < estList.length; i++) {
-      var la = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lat) : Number(estList[i].lat);
-      var ln = typeof parseCoord_ === 'function' ? parseCoord_(estList[i].lng) : Number(estList[i].lng);
-      if (!isFinite(la) || !isFinite(ln)) continue;
-      var d = google.maps.geometry.spherical.computeDistanceBetween(ptLatLng, new google.maps.LatLng(la, ln));
-      if (d < 100) return false;
-    }
-    // Checar adicionados nesta sessao
-    for (var j = 0; j < jaAdicionados.length; j++) {
-      var d2 = google.maps.geometry.spherical.computeDistanceBetween(ptLatLng, new google.maps.LatLng(jaAdicionados[j].lat, jaAdicionados[j].lng));
-      if (d2 < 100) return false;
-    }
-    return true;
-  });
+  document.getElementById('vrrProgressoDetalhe').textContent = 'Buscando candidatos...';
 
-  document.getElementById('vrrProgressoDetalhe').textContent = pontos.length + ' pontos no grid (filtrados)';
-
-  // Processar em serie para nao sobrecarregar GAS
-  _vrrProcessarFila(pontos, 0, pontos.length);
+  if (modo === 'osm') {
+    // Buscar candidatos reais do OpenStreetMap via Overpass
+    _vrrBuscarCandidatosOSM(centro, raio, function(pontos) {
+      var filtrados = _vrrFiltrarPontos(pontos);
+      document.getElementById('vrrProgressoDetalhe').textContent = filtrados.length + ' candidatos OSM filtrados';
+      _vrrProcessarFila(filtrados, 0, filtrados.length);
+    });
+  } else {
+    // Grid matematico como fallback
+    var step = Number(modo) || 250;
+    var pontos = _vrrGerarGrid(centro, raio, step);
+    var filtrados = _vrrFiltrarPontos(pontos);
+    document.getElementById('vrrProgressoDetalhe').textContent = filtrados.length + ' pontos no grid (filtrados)';
+    _vrrProcessarFila(filtrados, 0, filtrados.length);
+  }
 }
 
 function _vrrProcessarFila(pontos, idx, total) {
