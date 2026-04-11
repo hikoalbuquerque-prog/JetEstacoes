@@ -9227,11 +9227,13 @@ function _vrrScorePOIs(lat, lng) {
       + ');out count;';
 
     fetch('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(query))
-      .then(function(r){ return r.json(); })
-      .then(function(data) {
+      .then(function(r) { return r.text(); })
+      .then(function(text) {
+        if (!text || text.trim().length === 0) { resolve({ score: 10, count: 0 }); return; }
+        var data;
+        try { data = JSON.parse(text); } catch(e) { resolve({ score: 10, count: 0 }); return; }
         var count = (data.elements && data.elements[0] && data.elements[0].tags && data.elements[0].tags.total)
           ? Number(data.elements[0].tags.total) : 0;
-        // 0 POIs = 0 pts, 1-2 = 15, 3-5 = 22, >5 = 30
         var score = count === 0 ? 0 : count <= 2 ? 15 : count <= 5 ? 22 : 30;
         resolve({ score: score, count: count });
       })
@@ -9534,12 +9536,20 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   var url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
 
   fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function(text) {
+      if (!text || text.trim().length === 0) throw new Error('Resposta vazia');
+      var data;
+      try { data = JSON.parse(text); } catch(e) { throw new Error('JSON invalido'); }
       _processarResultadosLocais_(data.elements || [], lat, lng);
     })
     .catch(function(e) {
-      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Erro ao buscar locais</div>';
+      console.warn('[Locais] Overpass error:', e.message);
+      if (lista) lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Nenhum local encontrado (timeout ou sem conexao)</div>';
+      if (contEl) contEl.textContent = '';
     });
 }
 
