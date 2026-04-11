@@ -9542,6 +9542,31 @@ function _vrrAdicionarPonto(lat, lng) {
     cPlacePin(latLng);
     _mlpGeocodedAddr = null;
     _mlpGeocodeReverso_(lat, lng);
+
+    // Pre-carregar Street View no preview de foto do drawer
+    var mapsKey = window._MAPS_KEY || '';
+    if (mapsKey) {
+      var pp = document.getElementById('cPhotoPreview');
+      var pa = document.getElementById('cPhotoArea');
+      if (pp && pa) {
+        var svUrl = 'https://maps.googleapis.com/maps/api/streetview?size=600x300'
+          + '&location=' + lat + ',' + lng
+          + '&fov=90&pitch=0&key=' + mapsKey;
+        pp.src = svUrl;
+        pp.onload = function() {
+          pp.classList.add('visible');
+          pa.classList.add('has-photo');
+          // Marcar como preview SV (nao e foto real -- usuario deve fotografar o local)
+          pp.title = 'Imagem Street View -- tire uma foto real no local';
+          CS.photoDataUrl = null; // nao e foto real, nao envia ao salvar
+        };
+        pp.onerror = function() {
+          pp.classList.remove('visible');
+          pa.classList.remove('has-photo');
+        };
+      }
+    }
+
     setTimeout(function() {
       var elLat = document.getElementById('addLat');
       var elLng = document.getElementById('addLng');
