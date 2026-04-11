@@ -6704,12 +6704,31 @@ function cSyncPendentes() {
       foto: r.photoB64 ? { base64: r.photoB64, mime: r.photoMime || 'image/jpeg', name: 'foto.jpg' } : null
     };
     return new Promise(function(resolve) {
-      _gasRun('listarMonitor', undefined,
-          function(res) {
-          if (res && res.ok) { r.sync = 'SYNCED'; cPut(r).then(resolve); }
-          else resolve();
+      _gasRun('addEstacaoFromMapa', payload,
+        function(res) {
+          if (res && res.ok) {
+            r.sync = 'SYNCED';
+            cPut(r).then(function() {
+              // Adicionar ao mapa local se ainda nao esta
+              if (window.estacoes && res.estacao) {
+                var j = window.estacoes.findIndex(function(e){ return e.lid === r.lid; });
+                if (j < 0) {
+                  var est = res.estacao;
+                  est.__id = est.codigo ? ('COD:' + est.codigo) : ('tmp-' + Date.now());
+                  est.lat = est.lat || r.lat;
+                  est.lng = est.lng || r.lng;
+                  est.tipo = est.tipo || r.tipo;
+                  est.modalidade = r.modalidade || 'PATINETE';
+                  est.statusEstacao = 'SOLICITADO';
+                  window.estacoes.push(est);
+                  if (window._refreshMapa) window._refreshMapa();
+                }
+              }
+              resolve();
+            });
+          } else resolve();
         },
-          function() { resolve(); });
+        function() { resolve(); });
     });
   })).then(function() { cLoadRecords(); });
 }
@@ -7081,24 +7100,40 @@ async function cSubmit() {
         await cPut(rec);
         if (window.estacoes) {
           var novaEst = res.estacao || {};
-          novaEst.lat          = novaEst.lat          || rec.lat;
-          novaEst.lng          = novaEst.lng          || rec.lng;
-          novaEst.tipo         = novaEst.tipo         || rec.tipo;
-          novaEst.modalidade   = rec.modalidade       || 'PATINETE';
-          novaEst.statusEstacao= 'SOLICITADO';
-          novaEst.endereco     = novaEst.endereco     || rec.end;
-          novaEst.cidade       = novaEst.cidade       || rec.cidade;
-          novaEst.bairro       = novaEst.bairro       || rec.bairro;
-          novaEst.fotoUrl      = novaEst.foto         || novaEst.fotoUrl || '';
-          novaEst.__id         = novaEst.codigo       || ('tmp-' + Date.now());
+          novaEst.lat           = novaEst.lat          || rec.lat;
+          novaEst.lng           = novaEst.lng          || rec.lng;
+          novaEst.tipo          = novaEst.tipo         || rec.tipo;
+          novaEst.modalidade    = rec.modalidade       || 'PATINETE';
+          novaEst.statusEstacao = 'SOLICITADO';
+          novaEst.endereco      = novaEst.endereco     || rec.end;
+          novaEst.cidade        = novaEst.cidade       || rec.cidade;
+          novaEst.bairro        = novaEst.bairro       || rec.bairro;
+          novaEst.fotoUrl       = novaEst.foto         || novaEst.fotoUrl || '';
+          // Garantir __id unico antes do render
+          novaEst.__id = novaEst.codigo
+            ? ('COD:' + novaEst.codigo)
+            : ('tmp-' + Date.now());
           window.estacoes.push(novaEst);
-          // Garantir __id antes do render
-          if (!novaEst.__id) {
-            novaEst.__id = novaEst.codigo ? ('COD:' + novaEst.codigo) : ('tmp-' + Date.now());
+          // Atualizar estacoesPorCidade para o render usar
+          if (window.estacoesPorCidade && novaEst.cidade) {
+            if (!window.estacoesPorCidade[novaEst.cidade]) window.estacoesPorCidade[novaEst.cidade] = [];
+            window.estacoesPorCidade[novaEst.cidade].push(novaEst);
           }
-          // Atualizar mapa imediatamente (sem reload)
+          // Invalidar cache de grid e re-renderizar SEM reload do servidor
           if (window._mapInvalidateGrid && novaEst.cidade) window._mapInvalidateGrid(novaEst.cidade);
-          if (window._recarregarEstacoes) window._recarregarEstacoes();
+          if (window._mapInvalidateCache) window._mapInvalidateCache();
+          if (window._refreshMapa) window._refreshMapa();
+          // Remover pin de aprovado da varredura (agora e estacao oficial)
+          if (window._vrrAprovadosMarkers) {
+            window._vrrAprovadosMarkers = window._vrrAprovadosMarkers.filter(function(m) {
+              var pos = m.getPosition();
+              if (pos && Math.abs(pos.lat() - rec.lat) < 0.0001 && Math.abs(pos.lng() - rec.lng) < 0.0001) {
+                m.setMap(null);
+                return false;
+              }
+              return true;
+            });
+          }
         }
       }
     } catch(e) {}
@@ -7403,14 +7438,28 @@ function cDeleteEstacao() {
       if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
       var cod = _editEstacao && _editEstacao.codigo;
       var codExcluido = _editEstacao && _editEstacao.codigo;
+      var latExcluida = _editEstacao && _editEstacao.lat;
+      var lngExcluida = _editEstacao && _editEstacao.lng;
       cToast('Estacao excluida!', 'success');
       cCloseEdit();
       _editEstacao = null;
-      // Remover do mapa imediatamente sem reload
+      // Remover do array local e re-renderizar -- SEM reload do servidor
       if (codExcluido && window._removerEstacao) {
         window._removerEstacao(codExcluido);
-      } else if (window._recarregarEstacoes) {
-        window._recarregarEstacoes();
+      } else if (latExcluida && lngExcluida) {
+        // Fallback: remover por coordenada se codigo nao disponivel
+        if (window.estacoes) {
+          var la = Number(latExcluida), ln = Number(lngExcluida);
+          var idx2 = window.estacoes.findIndex(function(e){
+            return Math.abs(Number(e.lat)-la) < 0.0001 && Math.abs(Number(e.lng)-ln) < 0.0001;
+          });
+          if (idx2 >= 0) {
+            var cod2 = window.estacoes[idx2].codigo;
+            window.estacoes.splice(idx2, 1);
+            if (cod2 && window._removerEstacao) window._removerEstacao(cod2);
+            else if (window._refreshMapa) window._refreshMapa();
+          }
+        }
       }
     },
     function(e) {
