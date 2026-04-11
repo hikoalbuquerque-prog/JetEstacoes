@@ -1,44 +1,43 @@
 /**
  * service-worker.js — App Estações Campo PWA
+ * SW_VERSION: campo-v5
  *
- * Estratégia: Cache-first para assets estáticos (shell),
- * Network-first para chamadas ao GAS backend.
- *
- * Cache names são versionados — bumpar SW_VERSION para forçar
- * atualização em todos os clientes.
+ * GAS backend usa redirect 302 -> script.googleusercontent.com
+ * O SW NAO intercepta chamadas ao GAS -- deixa o browser lidar
+ * diretamente para evitar problemas com redirects opacos.
  */
 
-var SW_VERSION   = 'campo-v3';
+var SW_VERSION   = 'campo-v5';
 var CACHE_STATIC = SW_VERSION + '-static';
-var CACHE_DATA   = SW_VERSION + '-data';
 
 // Assets do app shell (servidos pelo GitHub Pages)
 var STATIC_ASSETS = [
   './',
-  './index.html',
+  './campo.html',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
 ];
 
-// ── Install: pre-cache o shell ────────────────────────────────
+// ── Install ────────────────────────────────────────────────────
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(CACHE_STATIC).then(function(cache) {
-      return cache.addAll(STATIC_ASSETS);
+      // addAll com ignoreSearch para evitar erro em assets opcionais
+      return Promise.allSettled(
+        STATIC_ASSETS.map(function(url) { return cache.add(url); })
+      );
     }).then(function() {
       return self.skipWaiting();
     })
   );
 });
 
-// ── Activate: limpar caches antigos ──────────────────────────
+// ── Activate: limpar caches antigos ───────────────────────────
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
         keys.filter(function(key) {
-          return key !== CACHE_STATIC && key !== CACHE_DATA;
+          return key !== CACHE_STATIC;
         }).map(function(key) {
           return caches.delete(key);
         })
@@ -49,46 +48,48 @@ self.addEventListener('activate', function(event) {
   );
 });
 
-// ── Fetch: estratégia por tipo de request ────────────────────
+// ── Fetch ──────────────────────────────────────────────────────
 self.addEventListener('fetch', function(event) {
-  var url = new URL(event.request.url);
+  var url = event.request.url;
 
-  // Chamadas ao GAS backend: network-first, sem cache
-  if (url.hostname === 'script.google.com' ||
-      url.hostname.endsWith('.googleusercontent.com')) {
-    event.respondWith(
-      fetch(event.request).catch(function() {
-        return new Response(
-          JSON.stringify({ ok: false, error: 'Sem conexao. Verifique a internet.' }),
-          { headers: { 'Content-Type': 'application/json' } }
-        );
-      })
-    );
+  // NAO interceptar chamadas ao GAS nem ao Google APIs
+  // Deixar o browser lidar diretamente -- evita problemas com
+  // redirects 302 opacos do script.google.com
+  if (url.indexOf('script.google.com') >= 0 ||
+      url.indexOf('script.googleusercontent.com') >= 0 ||
+      url.indexOf('googleapis.com') >= 0 ||
+      url.indexOf('gstatic.com') >= 0 ||
+      url.indexOf('overpass') >= 0 ||
+      url.indexOf('maps.google') >= 0) {
+    // Nao chamar event.respondWith -- browser trata normalmente
     return;
   }
 
-  // Google Maps API: network-first com fallback
-  if (url.hostname === 'maps.googleapis.com' ||
-      url.hostname === 'maps.gstatic.com') {
-    event.respondWith(fetch(event.request));
-    return;
-  }
+  // App shell: cache-first para assets estaticos do GitHub Pages
+  if (event.request.method !== 'GET') return;
 
-  // App shell (GitHub Pages): cache-first
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) return cached;
       return fetch(event.request).then(function(response) {
-        // Cache apenas respostas válidas de assets estáticos
-        if (response && response.status === 200 &&
-            response.type === 'basic') {
+        if (response && response.status === 200 && response.type === 'basic') {
           var clone = response.clone();
           caches.open(CACHE_STATIC).then(function(cache) {
             cache.put(event.request, clone);
           });
         }
         return response;
+      }).catch(function() {
+        // Offline e nao tem cache -- retorna 503
+        return new Response('Offline', { status: 503 });
       });
     })
   );
+});
+
+// Aceitar comando SKIP_WAITING para atualizar imediatamente
+self.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
