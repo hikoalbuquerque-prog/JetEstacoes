@@ -9438,8 +9438,8 @@ function _vrrAdicionarItemLista(r) {
     + '</div>'
     + (r.calcadaObs ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px">' + r.calcadaObs + '</div>' : '')
     + '<div style="margin-top:6px;display:flex;gap:6px">'
-    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6)">Ver no mapa</button>'
-    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#10b981">+ Adicionar</button>' : '')
+    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;cursor:pointer;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6)">Ver</button>'
+    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:5px;border-radius:6px;font-size:10px;cursor:pointer;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#10b981">+ Add</button>' : '')
     + '</div>';
 
   lista.appendChild(div);
@@ -9586,11 +9586,9 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
   LOC_CATEGORIAS.forEach(function(cat) {
     var n = (porCategoria[cat.key] || []).length;
     if (n === 0) return;
-    html += '<div class="loc-pri-linha" onclick="filtrarLocaisCategoria('' + cat.key + '')">';
-    html += '<div class="loc-pri-dot" style="background:' + cat.cor + '"></div>';
-    html += '<div class="loc-pri-nome">' + cat.nome + '</div>';
-    html += '<div class="loc-pri-count" style="color:' + cat.cor + '">' + n + '</div>';
-    html += '</div>';
+    var catKey = cat.key;
+    html += '<div class="loc-pri-linha" onclick="filtrarLocaisCategoria(\"' + catKey + '\")">' + '<div class="loc-pri-dot" style="background:' + cat.cor + '"></div>' + '<div class="loc-pri-nome">' + cat.nome + '</div>' + '<div class="loc-pri-count" style="color:' + cat.cor + '">' + n + '</div>'
+      + '</div>';
   });
 
   lista.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Nenhum local encontrado</div>';
