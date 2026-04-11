@@ -3915,11 +3915,11 @@ input:focus, select:focus {
         payload.foto = await this.fileToBase64_(compressed);
       }
 
-      this.setOk_('Salvando…');
+      this.setOk_('Salvando...');
       const res = await this.callAddEstacao_(payload);
       if (!res?.ok) return this.setErr_(res?.error || 'Falha ao salvar.');
 
-      this.setOk_('Salvo! Atualizando mapa…');
+      this.setOk_('Salvo! Atualizando mapa...');
       try{
         const e = res.estacao;
         if (Array.isArray(window.estacoes)) window.estacoes.push(e);
@@ -5907,7 +5907,7 @@ function enhanceAllSelectsPremium_(){
         label.textContent = opt ? (opt.textContent || opt.value) : 'Selecione';
       } else {
         const texts = getSelectedTexts();
-        if (!texts.length) label.textContent = 'Selecionar…';
+        if (!texts.length) label.textContent = 'Selecionar...';
         else if (texts.length === 1) label.textContent = texts[0];
         else label.textContent = `${texts.length} selecionados`;
       }
@@ -6438,7 +6438,7 @@ function cShowSolicitacao(token, email) {
     + '      <svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
     + '    </div>'
     + '    <div class="cl-brand-name">Solicitar Acesso</div>'
-    + '    <div class="cl-brand-sub">Email nao cadastrado — preencha para solicitar</div>'
+    + '    <div class="cl-brand-sub">Email nao cadastrado  --  preencha para solicitar</div>'
     + '  </div>'
     + '  <div id="solStep1" style="display:flex;flex-direction:column;gap:10px">'
     + '    <div class="cl-input-wrap">'
@@ -8427,7 +8427,7 @@ function pCopiarTudo() {
   });
   navigator.clipboard.writeText(header + '\n' + rows.join('\n'))
     .then(function() { cToast('Copiado! Cole no Sheets com Ctrl+V', 'success'); })
-    .catch(function() { cToast('Erro ao copiar — use Ctrl+A no preview', 'error'); });
+    .catch(function() { cToast('Erro ao copiar  --  use Ctrl+A no preview', 'error'); });
 }
 
 function pDownloadCSV() {
@@ -8472,7 +8472,7 @@ function pLimparMsg() {
 }
 
 /* ══════════════════════════════════════════════════
-   DESENHAR POLÍGONOS — DrawingManager
+   DESENHAR POLÍGONOS  --  DrawingManager
 ══════════════════════════════════════════════════ */
 
 var _drawMap       = null;   // google.maps.Map para o painel de desenho
@@ -8606,7 +8606,7 @@ function drawDesfazer() {
   setTimeout(function() {
     _drawManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
   }, 50);
-  cToast('Desenho reiniciado — clique para recomeçar');
+  cToast('Desenho reiniciado  --  clique para recomeçar');
 }
 
 function drawCancelar() {
@@ -9528,14 +9528,9 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   // Montar query Overpass
   var queries = LOC_CATEGORIAS.map(function(cat) {
     return cat.query + '(around:' + raioMetros + ',' + lat + ',' + lng + ');';
-  }).join('
-');
+  }).join('');
 
-  var overpassQuery = '[out:json][timeout:10];
-(
-' + queries + '
-);
-out body;';
+  var overpassQuery = '[out:json][timeout:10];(' + queries + ');out body;';
   var url = 'https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(overpassQuery);
 
   fetch(url)
@@ -9691,7 +9686,7 @@ function abrirModalLocal(item) {
     svPh.textContent = 'Carregando Street View...';
   }
 
-  // Reset estado — ja inicia a analise IA automaticamente
+  // Reset estado  --  ja inicia a analise IA automaticamente
   document.getElementById('mlpResultadoIA').style.display = 'none';
   document.getElementById('mlpBotoesInicial').style.display = 'none';
   document.getElementById('mlpBotoesPos').style.display = 'none';
@@ -9908,7 +9903,7 @@ function _exibirResultadoIA_(resultado) {
   var confEl = document.getElementById('mlpIAConfianca');
   confEl.textContent = 'Confianca ' + (resultado.confianca || '?');
 
-  // Botão adicionar — sempre disponível mas com aviso se reprovado
+  // Botão adicionar  --  sempre disponível mas com aviso se reprovado
   var btnAdd = document.getElementById('mlpBtnAdicionar');
   if (aprovado === false) {
     btnAdd.style.background = 'linear-gradient(135deg,#b45309,#f59e0b)';
