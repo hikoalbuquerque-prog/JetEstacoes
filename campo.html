@@ -2602,7 +2602,7 @@ input:focus, select:focus {
       width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;
       font-size:12px;font-weight:700;
       background:linear-gradient(135deg,#059669,#10b981);color:white">
-      + Adicionar todos os Otimos em lote
+      Selecionar e Adicionar todos os Otimos
     </button>
   </div>
 </div>
@@ -8919,6 +8919,34 @@ function drawSalvarNovo() {
 
   // Limpar form
   document.getElementById('drawNome').value = '';
+
+  // Persistir no GAS (aba Limites_Mapeamento)
+  var novoItem = _polyItems[_polyItems.length - 1];
+  (function(it) {
+    _gasRun('salvarPoligono', it,
+      function(res) {
+        if (res && res.ok && res.rowId) {
+          it.rowId = res.rowId;
+          cToast('"' + it.nome + '" salvo na planilha!', 'success');
+          // Invalidar cache da cidade para aparecer no mapa principal
+          var cidadeSalva = it.cidade || '';
+          if (cidadeSalva && window._mapInvalidateGrid) window._mapInvalidateGrid(cidadeSalva);
+          // Invalidar polygonsLoaded do cache da cidade
+          if (window.perf && window.perf.cityCache) {
+            var cc = window.perf.cityCache instanceof Map
+              ? window.perf.cityCache.get(cidadeSalva)
+              : (window.perf.cityCache || {})[cidadeSalva];
+            if (cc) { cc.polygonsLoaded = false; cc.polygonsMeta = []; }
+          }
+          // Forcar re-render dos poligonos
+          if (typeof safeRenderRequest_ === 'function') safeRenderRequest_(true);
+        } else {
+          cToast('Local OK, GAS: ' + (res && res.error || 'sem resposta'), 'warn');
+        }
+      },
+      function(e) { cToast('Local OK. Erro GAS: ' + String(e), 'warn'); }
+    );
+  })(novoItem);
 }
 
 function drawSelecionarPoly(layerIdx) {
@@ -10028,19 +10056,34 @@ function _vrrConfirmarLote() {
   var pontos = _vrrSelecao.slice(); // copia
 
   if (!CS.user) {
-    cToast('Faca login antes de adicionar em lote', 'error');
-    return;
+    // Tentar pegar user do localStorage
+    var raw = localStorage.getItem('campoUser');
+    if (raw) { try { CS.user = JSON.parse(raw); } catch(e) {} }
+    if (!CS.user) {
+      cToast('Faca login antes de adicionar em lote', 'error');
+      return;
+    }
   }
 
+  console.log('[lote] iniciando save de', total, 'pontos. CS.user:', CS.user && CS.user.email);
   cToast('Salvando ' + total + ' estacoes...', 'info');
   var salvos = 0, erros = 0;
+  // Mostrar progresso no painel
+  var progEl = document.getElementById('vrrProgressoLabel');
+  var pctEl  = document.getElementById('vrrProgressoPct');
+  var progDiv = document.getElementById('vrrProgresso');
+  if (progDiv) progDiv.style.display = 'block';
 
   // Processar em serie para nao sobrecarregar o GAS
   function _salvarProximo(idx) {
     if (idx >= pontos.length) {
-      // Concluido
+      // Concluido -- zerar selecao agora
+      _vrrSelecao = [];
+      _vrrAtualizarLote();
+      if (progDiv) progDiv.style.display = 'none';
       var msg = salvos + ' estacoes salvas';
-      if (erros) msg += ', ' + erros + ' erros';
+      if (erros) msg += ', ' + erros + ' com erro';
+      console.log('[lote] concluido:', msg);
       cToast(msg, salvos > 0 ? 'success' : 'error');
       if (salvos > 0 && window._refreshMapa) window._refreshMapa();
       return;
@@ -10073,6 +10116,10 @@ function _vrrConfirmarLote() {
           function(res) {
             if (res && res.ok) {
               salvos++;
+              // Atualizar barra de progresso
+              var pct2 = Math.round(salvos / pontos.length * 100);
+              if (progEl) progEl.textContent = 'Salvando ' + salvos + '/' + pontos.length;
+              if (pctEl) pctEl.textContent = pct2 + '%';
               // Adicionar ao mapa local imediatamente
               window._vrrJaAdicionados = window._vrrJaAdicionados || [];
               window._vrrJaAdicionados.push(p);
@@ -10131,16 +10178,43 @@ function _vrrConfirmarLote() {
         );
       },
       function() {
-        // Geocode falhou -- tentar salvar sem endereco
-        erros++;
-        setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+        // Geocode falhou -- salvar mesmo assim sem endereco (nao e erro critico)
+        console.warn('[lote] geocode falhou para', p.lat, p.lng, '-- salvando sem endereco');
+        var payloadSemGeo = {
+          email: CS.user.email || '',
+          lat: p.lat, lng: p.lng,
+          tipo: tipo, modalidade: mod,
+          nomeConcorrente: '',
+          observacoes: obs || 'Adicionado em lote via Varredura IA',
+          status: 'SOLICITADO',
+          dimensoes: '', larguraFaixa: '',
+          geo: { cidade: '', bairro: '', endereco: '', pais: 'BR' },
+          operador: CS.user.email, origem: 'PWA_CAMPO_LOTE', foto: null
+        };
+        _gasRun('addEstacaoFromMapa', payloadSemGeo,
+          function(res) {
+            if (res && res.ok) {
+              salvos++;
+              _vrrMarcarAprovado(p.lat, p.lng, tipo);
+              window._vrrJaAdicionados = window._vrrJaAdicionados || [];
+              window._vrrJaAdicionados.push(p);
+            } else {
+              erros++;
+              console.warn('[lote] GAS erro sem geo:', res && res.error);
+            }
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+          },
+          function(e) {
+            erros++;
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+          }
+        );
       }
     );
   }
 
+  // Nao zerar selecao aqui -- zerar quando todos terminarem
   _salvarProximo(0);
-  _vrrSelecao = [];
-  _vrrAtualizarLote();
 }
 
 function _vrrAdicionarPonto(lat, lng) {
@@ -10225,8 +10299,22 @@ function _vrrAdicionarPonto(lat, lng) {
 }
 
 function vrrAdicionarAprovados() {
-  var aprovados = _vrrResultados.filter(function(r){ return r.score >= 70; });
-  cToast('Funcionalidade de adicao em lote em breve. Aprovados: ' + aprovados.length, 'info');
+  // Marcar checkboxes de todos os itens com score >= 70 e abrir modal
+  var marcados = 0;
+  document.querySelectorAll('.vrr-item').forEach(function(item) {
+    var score = Number(item.dataset.score || 0);
+    var chk = item.querySelector('input[type=checkbox]');
+    if (score >= 70 && chk && !chk.disabled) {
+      chk.checked = true;
+      marcados++;
+    }
+  });
+  _vrrAtualizarLote();
+  if (marcados > 0) {
+    _vrrAdicionarLote(); // abre o modal de confirmacao
+  } else {
+    cToast('Nenhum ponto otimo disponivel para adicionar', 'warn');
+  }
 }
 
 // ── LOCAIS PRIORITARIOS (Overpass API) ───────────────────────────
