@@ -5861,7 +5861,7 @@ function enhanceAllSelectsPremium_(){
     sel.style.pointerEvents = 'none';
 
     // If already has a custom UI sibling, don't duplicate
-    const existing = sel.parentElement?.querySelector(`.pxSelectWrap[data-for="${CSS.escape(sel.id || sel.name || '')}"]`);
+    var existing = sel.parentElement ? sel.parentElement.querySelector('[data-for="' + (sel.id || sel.name || '') + '"]') : null;
     if (existing) return;
 
     const wrap = document.createElement('div');
@@ -5909,7 +5909,7 @@ function enhanceAllSelectsPremium_(){
         const texts = getSelectedTexts();
         if (!texts.length) label.textContent = 'Selecionar...';
         else if (texts.length === 1) label.textContent = texts[0];
-        else label.textContent = `${texts.length} selecionados`;
+        else label.textContent = texts.length + ' selecionados';
       }
     }
 
@@ -5936,7 +5936,7 @@ function enhanceAllSelectsPremium_(){
             close();
           });
         } else {
-          it.textContent = `${opt.selected ? '☑' : '☐'} ${opt.textContent || opt.value}`;
+          it.textContent = (opt.selected ? '[x] ' : '[ ] ') + (opt.textContent || opt.value);
           it.addEventListener('click', () => {
             if (opt.disabled) return;
             opt.selected = !opt.selected;
@@ -9788,8 +9788,7 @@ function mlpAdicionarDireto() {
         // Nome local como observacao
         var elObs = document.getElementById('addObs');
         if (elObs && item.nome) {
-          elObs.value = (elObs.value ? elObs.value + '
-' : '') + 'Proximo a: ' + item.nome;
+          elObs.value = (elObs.value ? elObs.value + '\n' : '') + 'Proximo a: ' + item.nome;
         }
       }
 
