@@ -2607,6 +2607,42 @@ input:focus, select:focus {
   </div>
 </div>
 
+<!-- Legenda de pins de varredura (aparece quando varredura ativa) -->
+<div id="vrrLegenda" style="
+  display:none;
+  position:fixed;
+  bottom:80px;
+  left:12px;
+  z-index:7000;
+  background:rgba(13,18,30,.92);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;
+  padding:10px 12px;
+  font-size:10px;
+  backdrop-filter:blur(8px);
+  pointer-events:none;
+">
+  <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.08em;margin-bottom:6px">VARREDURA IA</div>
+  <div style="display:flex;flex-direction:column;gap:5px">
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:50%;background:#10b981;flex-shrink:0"></div>
+      <span style="color:rgba(255,255,255,.7)">Otimo (score ≥ 70)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:50%;background:#f59e0b;flex-shrink:0"></div>
+      <span style="color:rgba(255,255,255,.7)">Possivel (40–69)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="width:12px;height:12px;border-radius:50%;background:#ef4444;flex-shrink:0"></div>
+      <span style="color:rgba(255,255,255,.7)">Ruim (&lt; 40)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;margin-top:2px;padding-top:5px;border-top:1px solid rgba(255,255,255,.08)">
+      <div style="width:12px;height:12px;border-radius:50%;background:#60a5fa;border:2px solid #f59e0b;flex-shrink:0;box-sizing:border-box"></div>
+      <span style="color:rgba(255,255,255,.7)">Aprovado p/ add</span>
+    </div>
+  </div>
+</div>
+
 <!-- Modal confirmacao lote varredura -->
 <div id="vrrLoteModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:90000;background:rgba(0,0,0,.7);align-items:center;justify-content:center">
   <div style="background:#0d1830;border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:24px;width:300px;max-width:90vw">
@@ -7366,11 +7402,16 @@ function cDeleteEstacao() {
       if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
       if (!res || !res.ok) { cToast(res && res.error ? res.error : 'Erro ao excluir', 'error'); return; }
       var cod = _editEstacao && _editEstacao.codigo;
+      var codExcluido = _editEstacao && _editEstacao.codigo;
       cToast('Estacao excluida!', 'success');
       cCloseEdit();
       _editEstacao = null;
-      // Recarregar do servidor para garantir mapa sincronizado
-      if (window._recarregarEstacoes) window._recarregarEstacoes();
+      // Remover do mapa imediatamente sem reload
+      if (codExcluido && window._removerEstacao) {
+        window._removerEstacao(codExcluido);
+      } else if (window._recarregarEstacoes) {
+        window._recarregarEstacoes();
+      }
     },
     function(e) {
       if (btn) { btn.disabled = false; btn.textContent = 'Salvar'; }
@@ -9748,8 +9789,9 @@ function _vrrAdicionarHeatMarker(r) {
   marker.addListener('click', function(){
     _vrrAdicionarPonto(r.lat, r.lng);
   });
-  r.__marker = marker; // referencia direta para remover sem loop
+  r.__marker = marker;
   _vrrHeatMarkers.push(marker);
+  _vrrMostrarLegenda();
 }
 
 // Marcadores de aprovados (pin verde estrela -- persistem apos fechar painel)
@@ -9758,20 +9800,24 @@ var _vrrAprovadosMarkers = [];
 function _vrrMarcarAprovado(lat, lng, label) {
   var gmap = window._gmap;
   if (!gmap) return;
+  // Bolinha azul com borda dourada = estacao sugerida pela IA (pendente cadastro)
   var m = new google.maps.Marker({
     position: { lat: lat, lng: lng },
     map: gmap,
     icon: {
-      path: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
-      fillColor: '#10b981',
-      fillOpacity: 1,
-      strokeColor: '#fff',
-      strokeWeight: 1.5,
-      scale: 1.2,
-      anchor: new google.maps.Point(12, 12)
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 9,
+      fillColor: '#60a5fa',
+      fillOpacity: 0.95,
+      strokeColor: '#f59e0b',
+      strokeWeight: 2.5
     },
-    title: 'Aprovado: ' + (label || 'Novo ponto'),
-    zIndex: 500
+    title: (label || 'Sugerido IA') + ' (pendente cadastro)',
+    zIndex: 480
+  });
+  // Clique no pin aprovado abre drawer de add no mesmo ponto
+  m.addListener('click', function() {
+    _vrrAdicionarPonto(lat, lng);
   });
   _vrrAprovadosMarkers.push(m);
 }
@@ -9779,6 +9825,16 @@ function _vrrMarcarAprovado(lat, lng, label) {
 function _vrrLimparHeat() {
   _vrrHeatMarkers.forEach(function(m){ m.setMap(null); });
   _vrrHeatMarkers = [];
+  // Esconder legenda se nao ha aprovados
+  if (!window._vrrAprovados || !window._vrrAprovados.length) {
+    var leg = document.getElementById('vrrLegenda');
+    if (leg) leg.style.display = 'none';
+  }
+}
+
+function _vrrMostrarLegenda() {
+  var leg = document.getElementById('vrrLegenda');
+  if (leg) leg.style.display = 'block';
 }
 
 // ── Item na lista ─────────────────────────────────────
@@ -9860,12 +9916,18 @@ function _vrrRecusar(btn, lat, lng) {
   if (!motivo) return;
   var motivoTexto = motivos[Number(motivo)-1] || motivo;
   _vrrFeedbacks.push({ lat: lat, lng: lng, motivo: motivoTexto, ts: Date.now() });
-  // Remover da lista visualmente
+  // Remover da lista com animacao e depois do DOM
   var item = btn.closest('.vrr-item');
   if (item) {
-    item.style.opacity = '0.3';
-    item.style.pointerEvents = 'none';
-    item.style.textDecoration = 'line-through';
+    item.style.transition = 'opacity .3s, max-height .4s';
+    item.style.opacity = '0';
+    item.style.overflow = 'hidden';
+    setTimeout(function() {
+      item.style.maxHeight = '0';
+      item.style.padding = '0';
+      item.style.margin = '0';
+      setTimeout(function(){ if (item.parentNode) item.parentNode.removeChild(item); }, 400);
+    }, 300);
   }
   // Remover heat marker correspondente + do array
   _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
@@ -9936,6 +9998,19 @@ function _vrrAdicionarPonto(lat, lng) {
       return false;
     }
     return true;
+  });
+  // Marcar item da lista como aprovado (fundo verde suave)
+  document.querySelectorAll('.vrr-item').forEach(function(item) {
+    var ilat = Number(item.dataset.lat);
+    var ilng = Number(item.dataset.lng);
+    if (Math.abs(ilat - lat) < 0.0001 && Math.abs(ilng - lng) < 0.0001) {
+      item.style.background = 'rgba(16,185,129,.12)';
+      item.style.border = '1px solid rgba(16,185,129,.3)';
+      item.style.borderRadius = '8px';
+      // Desabilitar botao Add para nao duplicar
+      var btnAdd = item.querySelector('button[onclick*="_vrrAdicionarPonto"]');
+      if (btnAdd) { btnAdd.disabled = true; btnAdd.textContent = 'Adicionado'; btnAdd.style.opacity = '0.5'; }
+    }
   });
   fecharVarredura();
   var latLng = new google.maps.LatLng(lat, lng);
