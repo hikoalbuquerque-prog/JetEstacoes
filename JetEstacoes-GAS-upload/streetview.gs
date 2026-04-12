@@ -84,3 +84,49 @@ function gerarStreetViewEstacao(payload) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
 }
+
+function analisarCalcadaComGemini(params) {
+  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!key) return { ok: false, error: 'GEMINI_API_KEY nao configurada' };
+
+  var imagens = params.imagens || [];
+  if (!imagens.length) return { ok: false, error: 'Sem imagens' };
+
+  var parts = [{
+    text: 'Analise estas imagens de calcada urbana. Avalie se tem faixa livre minima'
+      + ' de 2.8 metros para patinetes. Retorne APENAS JSON:'
+      + ' {"aprovado":true,"larguraEstimada":"X metros","observacoes":"texto","confianca":"alta","score":35}'
+  }];
+
+  imagens.forEach(function(b64) {
+    parts.push({
+      inline_data: { mime_type: 'image/jpeg', data: b64 }
+    });
+  });
+
+  var payload = {
+    contents: [{ parts: parts }],
+    generationConfig: { maxOutputTokens: 300, temperature: 0.1 }
+  };
+
+  try {
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key;
+    var resp = UrlFetchApp.fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    var code = resp.getResponseCode();
+    if (code !== 200) return { ok: false, error: 'HTTP ' + code + ': ' + resp.getContentText().substring(0, 100) };
+
+    var data = JSON.parse(resp.getContentText());
+    var text = data.candidates[0].content.parts[0].text;
+    var resultado = JSON.parse(text.replace(/```json|```/g, '').trim());
+    return { ok: true, resultado: resultado };
+
+  } catch(e) {
+    return { ok: false, error: String(e) };
+  }
+}
