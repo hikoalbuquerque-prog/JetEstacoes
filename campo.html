@@ -8325,16 +8325,81 @@ function cAbrirPoligonos() {
   var modal = document.getElementById('polyModal');
   if (!modal) return;
   modal.style.display = 'flex';
-  // Pre-preencher cidade com o filtro atual
+
   var fc = document.getElementById('cidadeFilter');
   if (fc && fc.value) {
     var pc = document.getElementById('pCidade');
-    if (pc && !pc.value) pc.value = fc.value;
+    if (pc) pc.value = fc.value;
   }
+
   polyTab(1);
-  if (_polyItems.length === 0) pCarregarDaBase();
+  pCarregarDaBase(true);
 }
 
+function pCarregarDaBase(force) {
+  var cidade = (document.getElementById('pCidade') || {}).value || '';
+  if (!cidade) cidade = (document.getElementById('cidadeFilter') || {}).value || '';
+
+  if (!cidade) {
+    cToast('Selecione uma cidade para carregar os polígonos.', 'warn');
+    return;
+  }
+
+  if (force) {
+    _polyItems = _polyItems.filter(function(x) {
+      return !x.rowId || x.cidade !== cidade;
+    });
+  }
+
+  _gasRun('getPoligonosCidade', { cidade: cidade },
+    function(lista) {
+      if (!Array.isArray(lista)) {
+        cToast('Resposta inválida ao carregar polígonos.', 'error');
+        return;
+      }
+
+      lista.forEach(function(p) {
+        var pts = Array.isArray(p.poligono) ? p.poligono : [];
+
+        var existente = _polyItems.find(function(x) {
+          return p.rowId && x.rowId && String(x.rowId) === String(p.rowId);
+        });
+
+        var novoObj = {
+          nome: p.nome || '',
+          grupo: p.grupo || '',
+          fase: p.fase || 'Fase 1',
+          tipo: p.tipo || '',
+          prioridade: Number(p.prioridade) || 1,
+          ativo: p.ativo !== false,
+          cor: p.cor || '#2563eb',
+          cidade: p.cidade || cidade,
+          pipe: pts.map(function(pt) { return pt.lat + ',' + pt.lng; }).join('|'),
+          rowId: p.rowId || null
+        };
+
+        if (existente) {
+          Object.assign(existente, novoObj);
+        } else {
+          _polyItems.push(novoObj);
+        }
+      });
+
+      pAtualizarBadges();
+      pRenderEditList();
+
+      if (typeof drawCarregarDePolyItems === 'function') {
+        drawCarregarDePolyItems();
+      }
+
+      cToast('Carregados ' + lista.length + ' polígono(s)', 'success');
+    },
+    function(e) {
+      cToast('Erro ao carregar polígonos: ' + e, 'error');
+    }
+  );
+}
+  
 function cFecharPoligonos() {
   var modal = document.getElementById('polyModal');
   if (modal) modal.style.display = 'none';
