@@ -77,6 +77,7 @@ const FOTOS_FOLDER_ID    = TARGET_FOTOS_FOLDER_ID;
 const STATIC_MAPS_API_KEY = 'AIzaSyD-yITmwagjpKPhAlTX1ecAJA7SNYfae5E';
 //////////////////////////////AIzaSyCFEVy4YPCq_lv1vP2RVfRUHIrjKU1q28E///////////////////////////////
 
+PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', 'AIzaSyAWq-l8qSIoURs7Z24rYpjwcKcV3EzWVkY');
 // Nomes exatos das colunas
 const COL = {
   RowKey      : 'RowKey',
@@ -1633,8 +1634,9 @@ function listarEstacoesParaVisualizacao() {
   const estacoes = [];
 
   dados.forEach(l => {
-    const lat = parseFloat(l[iLat]);
-    const lng = parseFloat(l[iLng]);
+    const lat = parseFloat(String(l[iLat]).replace(',', '.'));
+    const lng = parseFloat(String(l[iLng]).replace(',', '.'));
+
 
 
     // ignora registros inválidos para mapa
@@ -1845,8 +1847,8 @@ function getEstacoesWebApp() {
         const cidade = String(row[iCidade] || '').trim();
         if (!cidade) continue;
 
-        const lat = parseFloat(row[iLat]);
-        const lng = parseFloat(row[iLng]);
+        const lat = parseFloat(String(l[iLat]).replace(',', '.'));
+        const lng = parseFloat(String(l[iLng]).replace(',', '.'));
         if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
 
         const cityKey = normalizeCityKey_(cidade);
@@ -1923,8 +1925,8 @@ function getEstacoesWebApp() {
         if (!cidade) continue;
         if (normalizeCityKey_(cidade) !== cityKey) continue;
 
-        const lat = parseFloat(row[iLat]);
-        const lng = parseFloat(row[iLng]);
+        const lat = parseFloat(String(l[iLat]).replace(',', '.'));
+        const lng = parseFloat(String(l[iLng]).replace(',', '.'));
         if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) continue;
 
         out.push({
@@ -3078,4 +3080,141 @@ function gerarImagensSelecao_(tipo) {
   }
 
   SpreadsheetApp.getUi().alert(msg);
+}
+
+function getStreetViewBase64(lat, lng, heading) {
+  var key = PropertiesService.getScriptProperties().getProperty('GMAPS_API_KEY');
+  var url = 'https://maps.googleapis.com/maps/api/streetview?size=400x300'
+    + '&location=' + lat + ',' + lng
+    + '&fov=90&pitch=0&heading=' + (heading || 0)
+    + '&key=' + key;
+  
+  try {
+    var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return null;
+    var bytes = resp.getContent();
+    return Utilities.base64Encode(bytes);
+  } catch(e) {
+    return null;
+  }
+}
+
+function analisarCalcadaIA(params) {
+  var lat = Number(params && params.lat || 0);
+  var lng = Number(params && params.lng || 0);
+  if (!lat || !lng) return { ok: false, error: 'Coords invalidas' };
+
+  var geminiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+  if (!geminiKey) return { ok: false, error: 'GEMINI_API_KEY nao configurada' };
+
+  var mapsKey = PropertiesService.getScriptProperties().getProperty('GMAPS_API_KEY');
+
+  // 1. Buscar 2 angulos de Street View
+  var headings = [0, 90];
+  var parts = [{
+  text:
+    'Voce e um especialista em infraestrutura urbana para micromobilidade.' +
+    ' Analise com rigor tecnico as imagens de Street View e determine se existe uma CALCADA REALMENTE ADEQUADA para instalar uma estacao de patinetes eletricos.' +
+
+    '\n\nOBJETIVO:' +
+    '\nResponder se o ponto mostrado possui area de calcada suficiente, segura e urbana para instalacao de estacao.' +
+
+    '\n\nREGRA GERAL MAIS IMPORTANTE:' +
+    '\nSo aprove se a calcada estiver claramente visivel e se houver evidencia visual suficiente de largura livre adequada.' +
+    '\nSe houver qualquer duvida relevante, baixa visibilidade, enquadramento ruim, imagem distante, obstrucao ou impossibilidade de confirmar a calcada, responda aprovado:false.' +
+    '\nNao aprove por inferencia.' +
+
+    '\n\nCRITERIOS OBRIGATORIOS PARA APROVACAO (todos devem ser atendidos):' +
+    '\n1. Deve existir CALCADA claramente visivel e separada da pista de veiculos.' +
+    '\n2. A area analisada deve ser calcada urbana, e nao rua, acostamento, faixa de onibus, ciclovia, estacionamento, entrada de garagem, canteiro, gramado ou sarjeta.' +
+    '\n3. A largura livre estimada da calcada deve ser de pelo menos 2.8 metros.' +
+    '\n4. A faixa livre deve permitir a estacao + circulacao de pedestres sem bloqueio relevante.' +
+    '\n5. Nao pode haver obstrucao dominante por poste, arvore, banca, lixeira grande, gradil, ponto de onibus apertado, mobiliario urbano ou estruturas fixas.' +
+    '\n6. O local deve parecer area urbana real com infraestrutura de calcada utilizavel.' +
+
+    '\n\nREGRAS DE REPROVACAO IMEDIATA (aprovado:false, score entre 0 e 5):' +
+    '\n- A imagem mostra principalmente pista, asfalto ou faixa de veiculos sem calcada lateral claramente utilizavel.' +
+    '\n- O ponto esta sobre meio-fio, sarjeta, canteiro central, area gramada, terra, lote vazio ou area sem urbanizacao adequada.' +
+    '\n- A imagem mostra estacionamento, recuo de garagem ou area de embarque/desembarque sem calcada livre suficiente.' +
+    '\n- A calcada parece ter menos de 2.0 metros de largura livre.' +
+    '\n- A imagem esta noturna, borrada, distante, cortada, obstruida ou sem evidencia suficiente para confirmar a calcada.' +
+    '\n- Existe ciclovia ou faixa de onibus, mas nao ha calcada livre adequada e independente.' +
+
+    '\n\nREGRAS IMPORTANTES DE INTERPRETACAO:' +
+    '\n- Considere apenas o que esta visualmente evidenciado nas imagens.' +
+    '\n- Nao assuma continuidade da calcada fora do enquadramento.' +
+    '\n- Nao confunda recuo viario, baia, acostamento ou piso asfaltado com calcada.' +
+    '\n- Ponto de onibus so pode ser aprovado se houver calcada lateral ampla e claramente separada da pista.' +
+    '\n- Se houver varias imagens, use o conjunto delas, mas seja conservador: se nenhuma comprovar adequadamente a calcada, reprovar.' +
+    '\n- A aprovacao exige evidencia positiva, nao ausencia de problema.' +
+
+    '\n\nESCALA DE SCORE:' +
+    '\n0 a 5  = reprovado categoricamente, sem calcada adequada ou sem evidencia minima.' +
+    '\n6 a 15 = reprovado, ha alguma calcada aparente mas insuficiente, inadequada ou muito duvidosa.' +
+    '\n16 a 25 = reprovado, calcada existe mas nao ha seguranca para aprovar por largura, obstrucao ou contexto.' +
+    '\n26 a 32 = aprovado com ressalvas, calcada adequada e visivel.' +
+    '\n33 a 40 = aprovado com alta confianca, calcada ampla, urbana e claramente adequada.' +
+
+    '\n\nINSTRUCOES DE SAIDA:' +
+    '\nRetorne APENAS um JSON valido, sem markdown, sem texto extra, sem comentarios.' +
+    '\nUse exatamente este formato:' +
+    '\n{"aprovado":true/false,"larguraEstimada":"X metros ou indefinido","observacoes":"motivo objetivo em portugues","confianca":"alta/media/baixa","score":0}' +
+
+    '\n\nREGRAS FINAIS DO JSON:' +
+    '\n- "aprovado" deve ser true somente se TODOS os criterios obrigatorios forem atendidos visualmente.' +
+    '\n- "larguraEstimada" deve ser conservadora. Se nao for possivel estimar com seguranca, use "indefinido".' +
+    '\n- "observacoes" deve explicar de forma curta e objetiva o principal motivo da decisao.' +
+    '\n- "confianca" deve refletir a clareza visual real da imagem.' +
+    '\n- "score" deve ser inteiro entre 0 e 40 e coerente com aprovado.' +
+    '\n- Se houver incerteza relevante, use aprovado:false.'
+}];
+
+  headings.forEach(function(h) {
+    var url = 'https://maps.googleapis.com/maps/api/streetview?size=400x300'
+      + '&location=' + lat + ',' + lng
+      + '&fov=90&pitch=0&heading=' + h + '&key=' + mapsKey;
+    try {
+      var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+      if (resp.getResponseCode() === 200) {
+        var bytes = resp.getContent();
+        if (bytes.length > 5000) {
+          parts.push({
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: Utilities.base64Encode(bytes)
+            }
+          });
+        }
+      }
+    } catch(e) {}
+  });
+
+  if (parts.length < 2) return { ok: false, error: 'Street View nao disponivel' };
+
+  // 2. Chamar Gemini com as imagens
+  try {
+    var payload = {
+      contents: [{ parts: parts }],
+      generationConfig: { maxOutputTokens: 300, temperature: 0.1 }
+    };
+    var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + geminiKey;
+    var res = UrlFetchApp.fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    if (res.getResponseCode() !== 200) {
+      return { ok: false, error: 'Gemini HTTP ' + res.getResponseCode() };
+    }
+
+    var data = JSON.parse(res.getContentText());
+    var text = data.candidates[0].content.parts[0].text;
+    var resultado = JSON.parse(text.replace(/```json|```/g, '').trim());
+    return { ok: true, resultado: resultado };
+
+  } catch(e) {
+    return { ok: false, error: String(e) };
+  }
 }
