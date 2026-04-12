@@ -9475,78 +9475,73 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   var lat = centro.lat();
   var lng = centro.lng();
 
-  // Query Overpass: nos e ways relevantes para instalacao de patinete
-  // Prioridade: comercio (alta demanda), no de calcada, parada de bus com sidewalk
-  // Excluir: meio de pista, estacionamento, parque sem calcada
   var query = '[out:json][timeout:15];('
-    // Comercios e servicos -- alta demanda de patinetes
     + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["shop"~"mall|supermarket|convenience|bakery|clothes|electronics"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["shop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["office"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    // Transporte -- intermodal
-    + 'node["highway"="bus_stop"]["shelter"="yes"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["railway"~"subway_entrance|station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    // Intersecoes de calcada -- bons pontos de fluxo
+    + 'node["public_transport"~"platform|stop_position"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["railway"~"station|subway_entrance|tram_stop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["highway"="crossing"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["highway"="street_lamp"]["sidewalk"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    // Pontos de interesse turistico/lazer
     + 'node["tourism"~"attraction|museum|gallery"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["leisure"~"park|fitness_station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + ');out center 120;';
 
   var urls = [
     'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter'
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ];
 
   function tryUrl(idx) {
     if (idx >= urls.length) {
-      cToast('OSM indisponivel, usando grid matematico', 'warn');
-      // Fallback para grid 250m
-      callback(_vrrGerarGrid(centro, raioMetros, 250));
+      cToast('OSM indisponível. No modo OSM não vou usar grid.', 'warn');
+      callback([]);
       return;
     }
+
     fetch(urls[idx] + '?data=' + encodeURIComponent(query))
       .then(function(r) {
-        if (r.status === 429) { tryUrl(idx + 1); return null; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })
       .then(function(data) {
-        if (!data) return;
         var pontos = [];
         var vistos = {};
+
         (data.elements || []).forEach(function(el) {
           var lat2 = el.lat || (el.center && el.center.lat);
           var lng2 = el.lon || (el.center && el.center.lon);
           if (!lat2 || !lng2) return;
-          // Deduplicar por grade de ~30m
+
           var chave = lat2.toFixed(4) + ',' + lng2.toFixed(4);
           if (vistos[chave]) return;
           vistos[chave] = true;
-          // Calcular score de prioridade pelo tipo de no
+
           var tags = el.tags || {};
-          var prioridade = 0;
-          if (tags.amenity && /restaurant|cafe|bank|pharmacy/.test(tags.amenity)) prioridade = 3;
+          var prioridade = 1;
+
+          if (tags.railway) prioridade = 5;
+          else if (tags.public_transport) prioridade = 4;
+          else if (tags.amenity && /restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace/.test(tags.amenity)) prioridade = 4;
           else if (tags.shop || tags.office) prioridade = 3;
-          else if (tags.railway) prioridade = 4; // metro = altissima prioridade
-          else if (tags.amenity === 'bus_stop') prioridade = 2;
-          else if (tags.highway === 'crossing') prioridade = 1;
-          else prioridade = 1;
+          else if (tags.highway === 'crossing') prioridade = 2;
+
           pontos.push({ lat: lat2, lng: lng2, prioridade: prioridade, tags: tags });
         });
-        // Ordenar por prioridade desc -- analisar os mais importantes primeiro
+
         pontos.sort(function(a, b) { return b.prioridade - a.prioridade; });
-        // Limitar a 60 pontos para nao sobrecarregar GAS
         if (pontos.length > 60) pontos = pontos.slice(0, 60);
-        // Mostrar pins OSM no mapa como referencia visual
+
         _vrrMostrarPinsOSM(pontos);
         callback(pontos);
       })
-      .catch(function() { tryUrl(idx + 1); });
+      .catch(function() {
+        tryUrl(idx + 1);
+      });
   }
+
   tryUrl(0);
 }
-
 // Mostrar pins OSM no mapa como contexto visual (azul pequeno)
 var _vrrOSMMarkers = [];
 function _vrrMostrarPinsOSM(pontos) {
@@ -9761,14 +9756,22 @@ function iniciarVarredura() {
     _vrrProcessarFila(filtrados, 0, filtrados.length);
   }
 
-  if (modo === 'osm') {
-    _vrrBuscarCandidatosOSM(centro, raio, _processarComFuros);
-  } else {
-    var step = Number(modo) || 250;
-    _processarComFuros(_vrrGerarGrid(centro, raio, step));
-  }
+if (modo === 'osm') {
+  _vrrBuscarCandidatosOSM(centro, raio, function(pontos) {
+    if (!pontos || !pontos.length) {
+      document.getElementById('vrrProgresso').style.display = 'none';
+      document.getElementById('vrrBtnIniciar').disabled = false;
+      _vrrAtivo = false;
+      cToast('Nenhum candidato OSM encontrado ou serviço indisponível.', 'warn');
+      return;
+    }
+    _processarComFuros(pontos);
+  });
+} else {
+  var step = Number(modo) || 250;
+  _processarComFuros(_vrrGerarGrid(centro, raio, step));
 }
-
+  
 function _vrrProcessarFila(pontos, idx, total) {
   if (_vrrParar || idx >= total) {
     _vrrAtivo = false;
