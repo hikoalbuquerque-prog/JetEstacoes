@@ -87,16 +87,18 @@ function doPost(e) {
 }
 
 function dispatchAction_(action, params) {
+  params = params || {};
+
   switch (action) {
     // Auth
     case 'validateUser':
       return validateUser(params.tokenId);
 
-    // Estacoes (existente em Codigo.gs)
+    // Estações
     case 'addEstacaoFromMapa':
       return addEstacaoFromMapa(params);
 
-    // Novos endpoints PWA
+    // PWA
     case 'reverseGeocodePWA':
       return reverseGeocodePWA(params);
     case 'getMinhasEstacoes':
@@ -112,21 +114,19 @@ function dispatchAction_(action, params) {
     case 'listarUsuarios':
       return listarUsuariosApi(params);
 
-    // Mapa desktop (existentes em Codigo.gs)
+    // Mapa desktop
     case 'getEstacoesWebApp':
       return getEstacoesWebApp();
     case 'getCitiesIndex':
       return getCitiesIndex();
     case 'getEstacoesByCity':
       return getEstacoesByCity(params.cityKey);
-    case 'getPoligonosCidade':
-      return getPoligonosCidade(params.cidade);
     case 'getJetCrossMapa':
       return getJetCrossMapa(params.cidade);
     case 'validateAddPass':
       return { ok: validateAddPass(params.pass) };
 
-    // Solicitacoes de acesso (acesso.gs)
+    // Solicitações de acesso
     case 'solicitarAcesso':
       return solicitarAcesso(params);
     case 'aprovarSolicitacao':
@@ -136,44 +136,59 @@ function dispatchAction_(action, params) {
     case 'listarSolicitacoesPendentes':
       return listarSolicitacoesPendentes(params);
 
-    // ── Auth Campo ────────────────────────────────────────
+    // Auth Campo
     case 'loginCampo':
       return loginCampo(params.email, params.senha);
- 
     case 'recuperarSenha':
       return recuperarSenha(params.email || params);
- 
-    // ── CRUD estações ─────────────────────────────────────
+
+    // CRUD estações
     case 'editarEstacaoFromMapa':
       return editarEstacaoFromMapa(params);
- 
     case 'excluirEstacaoFromMapa':
       return excluirEstacaoFromMapa(params);
- 
-    // ── Monitor ────────────────────────────────────────────
+
+    // Monitor
     case 'listarMonitor':
       return listarMonitor();
- 
     case 'toggleMonitor':
       return toggleMonitor(params);
- 
-    // ── Street View ────────────────────────────────────────
+
+    // Street View / IA
     case 'gerarStreetViewEstacao':
       return gerarStreetViewEstacao(params);
 
+    case 'analisarCalcadaIA':
+      return (typeof analisarCalcadaIA === 'function' && analisarCalcadaIA.length >= 2)
+        ? analisarCalcadaIA(params.lat, params.lng)
+        : analisarCalcadaIA(params);
+
     case 'getMapsKey':
       return { ok: true, key: getMapsApiKey_() };
- 
-    // ── Geocode (alias) ────────────────────────────────────
+
+    case 'analisarCalcadaComGemini':
+      return analisarCalcadaComGemini(params);
+
+    // Geocode
     case 'geocodeEndereco':
       return geocodeEnderecoPWA_({ endereco: params.q || params.endereco || params });
 
-    // ── Poligono (alias) ────────────────────────────────────
-    case 'getPoligonosCidade': return getPoligonosCidade(typeof params === 'string' ? params : (params.cidade || params));
-    case 'atualizarPoligono': return atualizarPoligono(params);
-    case 'excluirPoligono':   return excluirPoligono(params);
+    // Polígonos
+    case 'getPoligonosCidade': {
+      var cidade = (typeof params === 'string')
+        ? params
+        : (params.cidade || params.city || '');
+      return getPoligonosCidade(cidade);
+    }
 
- 
+    case 'salvarPoligono':
+      return salvarPoligono(params);
+
+    case 'atualizarPoligono':
+      return atualizarPoligono(params);
+
+    case 'excluirPoligono':
+      return excluirPoligono(params);
 
     default:
       return { ok: false, error: 'Acao desconhecida: ' + action };
