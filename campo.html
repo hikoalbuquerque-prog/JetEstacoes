@@ -9536,18 +9536,19 @@ function _vrrFiltrarPontos(pontos) {
 // ── Buscar candidatos reais via OSM Overpass ─────────────────────
 // Retorna nos de: calcadas, esquinas comerciais, entradas de comercio,
 // pontos de referencia, paradas de bus (com calcada lateral)
+
 function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   var lat = centro.lat();
   var lng = centro.lng();
 
   var query = '[out:json][timeout:15];('
-    + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["shop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace|clinic|college"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["shop"~"mall|supermarket|department_store|convenience|bakery|clothes|electronics|shopping_centre"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["office"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["public_transport"~"platform|stop_position"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["public_transport"="platform"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["railway"~"station|subway_entrance|tram_stop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["tourism"~"attraction|museum|gallery"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["leisure"~"park|fitness_station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["tourism"~"attraction|museum|gallery|hotel|hostel|motel"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["leisure"~"fitness_centre|sports_centre"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + ');out center 120;';
 
   var urls = [
@@ -9556,55 +9557,6 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ];
 
-  function tryUrl(idx) {
-    if (idx >= urls.length) {
-      cToast('OSM indisponível. No modo OSM não vou usar grid.', 'warn');
-      callback([]);
-      return;
-    }
-
-    fetch(urls[idx] + '?data=' + encodeURIComponent(query))
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function(data) {
-        var pontos = [];
-        var vistos = {};
-
-        (data.elements || []).forEach(function(el) {
-          var lat2 = el.lat || (el.center && el.center.lat);
-          var lng2 = el.lon || (el.center && el.center.lon);
-          if (!lat2 || !lng2) return;
-
-          var chave = lat2.toFixed(4) + ',' + lng2.toFixed(4);
-          if (vistos[chave]) return;
-          vistos[chave] = true;
-
-          var tags = el.tags || {};
-          var prioridade = 1;
-
-          if (tags.railway) prioridade = 5;
-          else if (tags.public_transport) prioridade = 4;
-          else if (tags.amenity && /restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace/.test(tags.amenity)) prioridade = 4;
-          else if (tags.shop || tags.office) prioridade = 3;
-
-          pontos.push({ lat: lat2, lng: lng2, prioridade: prioridade, tags: tags });
-        });
-
-        pontos.sort(function(a, b) { return b.prioridade - a.prioridade; });
-        if (pontos.length > 60) pontos = pontos.slice(0, 60);
-
-        _vrrMostrarPinsOSM(pontos);
-        callback(pontos);
-      })
-      .catch(function() {
-        tryUrl(idx + 1);
-      });
-  }
-
-  tryUrl(0);
-}
   function distM_(aLat, aLng, bLat, bLng) {
     var p1 = new google.maps.LatLng(aLat, aLng);
     var p2 = new google.maps.LatLng(bLat, bLng);
@@ -9675,7 +9627,6 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
           var base = prioridadeBase_(tags);
           if (base <= 0) return;
 
-          // Dedup espacial real: evita pontos quase colados
           var repetido = vistos.some(function(v) {
             return distM_(lat2, lng2, v.lat, v.lng) < 22;
           });
@@ -9685,24 +9636,20 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
           var nome = String(tags.name || '').trim();
           var cat = categoria_(tags);
 
-          // Se for categoria fraca e sem nome, corta
           if (!nome && (cat === 'office' || cat === 'tourism' || cat === 'leisure')) {
             return;
           }
 
           var dist = distM_(lat, lng, lat2, lng2);
 
-          // Bônus por proximidade
           var bonusDist = 0;
           if (dist <= 80) bonusDist = 18;
           else if (dist <= 140) bonusDist = 12;
           else if (dist <= 220) bonusDist = 7;
           else if (dist <= 320) bonusDist = 3;
 
-          // Bônus por nome conhecido
           var bonusNome = nome ? 6 : 0;
 
-          // Penalidade para categorias menos fortes
           var penal = 0;
           if (cat === 'tourism') penal += 8;
           if (cat === 'leisure') penal += 10;
@@ -9726,7 +9673,6 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
           return a.distancia - b.distancia;
         });
 
-        // corta mais agressivo
         if (pontos.length > 40) pontos = pontos.slice(0, 40);
 
         _vrrMostrarPinsOSM(pontos);
@@ -9740,14 +9686,25 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   tryUrl(0);
 }
 
-// Mostrar pins OSM no mapa como contexto visual (azul pequeno)
 var _vrrOSMMarkers = [];
+
 function _vrrMostrarPinsOSM(pontos) {
   _vrrOSMMarkers.forEach(function(m) { m.setMap(null); });
   _vrrOSMMarkers = [];
+
   var gmap = window._gmap;
   if (!gmap) return;
+
   pontos.forEach(function(p) {
+    var titulo = ((p.tags && (
+      p.tags.name ||
+      p.tags.amenity ||
+      p.tags.shop ||
+      p.tags.office ||
+      p.tags.railway ||
+      p.tags.public_transport
+    )) || 'Candidato OSM') + ' • ' + (p.distancia || '?') + 'm';
+
     var m = new google.maps.Marker({
       position: { lat: p.lat, lng: p.lng },
       map: gmap,
@@ -9758,16 +9715,16 @@ function _vrrMostrarPinsOSM(pontos) {
         fillOpacity: 0.5,
         strokeColor: '#3b82f6',
         strokeWeight: 1
-        },
-  title:
-    ((p.tags && (p.tags.name || p.tags.amenity || p.tags.shop || p.tags.office || p.tags.railway || p.tags.public_transport)) || 'Candidato OSM')
-    + ' • ' + (p.distancia || '?') + 'm'
-  zIndex: 100,
+      },
+      title: titulo,
+      zIndex: 100,
       clickable: false
     });
+
     _vrrOSMMarkers.push(m);
   });
 }
+
 
 function _vrrGerarGrid(centro, raioMetros, stepMetros) {
   var pontos = [];
