@@ -9546,7 +9546,6 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
     + 'node["office"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["public_transport"~"platform|stop_position"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["railway"~"station|subway_entrance|tram_stop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["highway"="crossing"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["tourism"~"attraction|museum|gallery"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["leisure"~"park|fitness_station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + ');out center 120;';
@@ -9586,11 +9585,11 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
           var prioridade = 1;
 
           if (tags.railway) prioridade = 5;
-          else if (tags.public_transport) prioridade = 4;
+          else if (tags.public_transport === 'platform') prioridade = 4;
           else if (tags.amenity && /restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace/.test(tags.amenity)) prioridade = 4;
           else if (tags.shop || tags.office) prioridade = 3;
-          else if (tags.highway === 'crossing') prioridade = 2;
-
+          else prioridade = 0;
+          
           pontos.push({ lat: lat2, lng: lng2, prioridade: prioridade, tags: tags });
         });
 
@@ -9836,7 +9835,91 @@ if (modo === 'osm') {
   var step = Number(modo) || 250;
   _processarComFuros(_vrrGerarGrid(centro, raio, step));
 }
-  
+
+function _vrrNormalizarCalcadaResultado(calcada) {
+  calcada = calcada || {};
+
+  var score = Number(calcada.score || 0);
+  if (!isFinite(score)) score = 0;
+
+  var aprovado = calcada.aprovado === true;
+  var largura = String(calcada.largura || calcada.larguraEstimada || '').trim();
+  var obs = String(calcada.obs || calcada.observacoes || '').trim();
+  var motivoCodigo = String(calcada.motivoCodigo || '').toUpperCase().trim();
+  var confianca = String(calcada.confianca || '').toLowerCase().trim();
+
+  var bloqueantes = {
+    'SEM_CALCADA': true,
+    'ESTACIONAMENTO': true,
+    'GARAGEM': true,
+    'ESCADA': true,
+    'INTERIOR': true,
+    'OUTRO_LADO_DA_RUA': true,
+    'OBSTRUCAO': true,
+    'LARGURA_INSUFICIENTE': true,
+    'IMAGEM_INSUFICIENTE': true,
+    'CRUZAMENTO': true,
+    'RECUO_PRIVADO': true,
+    'MURO_OU_LOTE': true
+  };
+
+  var aptoFisico = aprovado && score >= 26;
+
+  if (!largura || largura.toLowerCase() === 'indefinido') aptoFisico = false;
+  if (confianca === 'baixa') aptoFisico = false;
+  if (bloqueantes[motivoCodigo]) aptoFisico = false;
+
+  return {
+    aprovado: aprovado,
+    score: score,
+    largura: largura || 'indefinido',
+    obs: obs,
+    motivoCodigo: motivoCodigo || '',
+    confianca: confianca || '',
+    aptoFisico: aptoFisico
+  };
+}
+
+function _vrrClassificarResultado(r) {
+  if (!r || !r.aptoFisico) {
+    return {
+      key: 'RUIM',
+      cor: '#ef4444',
+      badge: 'REPROVADO',
+      bgBadge: 'rgba(239,68,68,.15)',
+      rank: 1
+    };
+  }
+
+  if (Number(r.score || 0) >= 70) {
+    return {
+      key: 'OTIMO',
+      cor: '#10b981',
+      badge: 'OTIMO',
+      bgBadge: 'rgba(16,185,129,.15)',
+      rank: 3
+    };
+  }
+
+  return {
+    key: 'POSSIVEL',
+    cor: '#f59e0b',
+    badge: 'REVISAR',
+    bgBadge: 'rgba(245,158,11,.15)',
+    rank: 2
+  };
+}
+
+function _vrrPodeAutoSelecionar(r) {
+  return !!(r && r.aptoFisico && Number(r.score || 0) >= 70);
+}
+
+function _vrrResumoClasseContagem_(classe) {
+  return _vrrResultados.filter(function(r) {
+    return _vrrClassificarResultado(r).key === classe;
+  }).length;
+}
+
 function _vrrProcessarFila(pontos, idx, total) {
   if (_vrrParar || idx >= total) {
     _vrrAtivo = false;
@@ -9847,40 +9930,71 @@ function _vrrProcessarFila(pontos, idx, total) {
   var pct = Math.round(idx / total * 100);
   document.getElementById('vrrProgressoBar').style.width = pct + '%';
   document.getElementById('vrrProgressoPct').textContent = pct + '%';
-  document.getElementById('vrrProgressoLabel').textContent = 'Analisando ponto ' + (idx+1) + ' de ' + total;
+  document.getElementById('vrrProgressoLabel').textContent = 'Analisando ponto ' + (idx + 1) + ' de ' + total;
 
   var p = pontos[idx];
   var scoreCobertura = _vrrScoreCobertura(p.lat, p.lng);
 
-  // POIs e calcada em paralelo
   Promise.all([
     _vrrScorePOIs(p.lat, p.lng),
     _vrrScoreCalcada(p.lat, p.lng)
   ]).then(function(resultados) {
-    var poi      = resultados[0];
-    var calcada  = resultados[1];
-    var total_score = scoreCobertura + poi.score + calcada.score;
+    var poi = resultados[0] || { score: 0, count: 0 };
+    var calcadaRaw = resultados[1] || {};
+    var calcada = _vrrNormalizarCalcadaResultado(calcadaRaw);
+
+    var totalScore = scoreCobertura + Number(poi.score || 0) + Number(calcada.score || 0);
 
     var resultado = {
-      lat: p.lat, lng: p.lng,
-      score: total_score,
-      scoreCobertura: scoreCobertura,
-      scorePOI: poi.score,
-      scoreCalcada: calcada.score,
-      poiCount: poi.count,
+      lat: p.lat,
+      lng: p.lng,
+      score: Math.round(totalScore),
+      scoreCobertura: Number(scoreCobertura || 0),
+      scorePOI: Number(poi.score || 0),
+      scoreCalcada: Number(calcada.score || 0),
+      poiCount: Number(poi.count || 0),
       calcadaObs: calcada.obs,
       calcadaLargura: calcada.largura,
-      aprovado: calcada.aprovado
+      aprovado: calcada.aprovado,
+      aptoFisico: calcada.aptoFisico,
+      calcadaConfianca: calcada.confianca,
+      calcadaMotivoCodigo: calcada.motivoCodigo
     };
 
     _vrrResultados.push(resultado);
     _vrrAdicionarHeatMarker(resultado);
     _vrrAdicionarItemLista(resultado);
 
-    // Proximo ponto com delay para nao travar
-    setTimeout(function(){ _vrrProcessarFila(pontos, idx + 1, total); }, 200);
+    setTimeout(function() {
+      _vrrProcessarFila(pontos, idx + 1, total);
+    }, 200);
+  }).catch(function(err) {
+    console.warn('Erro na varredura IA:', err);
+
+    var resultadoErro = {
+      lat: p.lat,
+      lng: p.lng,
+      score: Math.round(Number(scoreCobertura || 0)),
+      scoreCobertura: Number(scoreCobertura || 0),
+      scorePOI: 0,
+      scoreCalcada: 0,
+      poiCount: 0,
+      calcadaObs: 'Erro na analise de calcada',
+      calcadaLargura: 'indefinido',
+      aprovado: false,
+      aptoFisico: false,
+      calcadaConfianca: 'baixa',
+      calcadaMotivoCodigo: 'IMAGEM_INSUFICIENTE'
+    };
+
+    _vrrResultados.push(resultadoErro);
+    _vrrAdicionarHeatMarker(resultadoErro);
+    _vrrAdicionarItemLista(resultadoErro);
+
+    setTimeout(function() {
+      _vrrProcessarFila(pontos, idx + 1, total);
+    }, 200);
   });
-}
 }
 
 function pararVarredura() {
