@@ -9576,6 +9576,21 @@ function _vrrFiltrarPontos(pontos) {
 // Retorna nos de: calcadas, esquinas comerciais, entradas de comercio,
 // pontos de referencia, paradas de bus (com calcada lateral)
 
+function _vrrFallbackGridOSM(centro, raioMetros, callback) {
+  var step = 120;
+
+  try {
+    cToast('OSM indisponível. Usando grid de contingência.', 'warn');
+  } catch (e) {}
+
+  var pontos = _vrrGerarGrid(centro, raioMetros, step) || [];
+
+  if (typeof _vrrFiltrarPontos === 'function') {
+    pontos = _vrrFiltrarPontos(pontos) || [];
+  }
+
+  callback(pontos);
+}
 
 function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   var lat = centro.lat();
