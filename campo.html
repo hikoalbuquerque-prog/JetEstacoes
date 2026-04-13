@@ -10045,12 +10045,17 @@ function _vrrProcessarFila(pontos, idx, total) {
       scorePOI: Number(poi.score || 0),
       scoreCalcada: Number(calcada.score || 0),
       poiCount: Number(poi.count || 0),
+
       calcadaObs: calcada.obs,
       calcadaLargura: calcada.largura,
       aprovado: calcada.aprovado,
       aptoFisico: calcada.aptoFisico,
       calcadaConfianca: calcada.confianca,
-      calcadaMotivoCodigo: calcada.motivoCodigo
+      calcadaMotivoCodigo: calcada.motivoCodigo,
+
+      imagensAnalisadas: Number(calcadaRaw.imagensAnalisadas || 0),
+      imagensPositivas: Number(calcadaRaw.imagensPositivas || 0),
+      imagensBloqueantes: Number(calcadaRaw.imagensBloqueantes || 0)
     };
 
     _vrrResultados.push(resultado);
@@ -10071,12 +10076,17 @@ function _vrrProcessarFila(pontos, idx, total) {
       scorePOI: 0,
       scoreCalcada: 0,
       poiCount: 0,
+
       calcadaObs: 'Erro na analise de calcada',
       calcadaLargura: 'indefinido',
       aprovado: false,
       aptoFisico: false,
       calcadaConfianca: 'baixa',
-      calcadaMotivoCodigo: 'IMAGEM_INSUFICIENTE'
+      calcadaMotivoCodigo: 'IMAGEM_INSUFICIENTE',
+
+      imagensAnalisadas: 0,
+      imagensPositivas: 0,
+      imagensBloqueantes: 0
     };
 
     _vrrResultados.push(resultadoErro);
@@ -10088,7 +10098,7 @@ function _vrrProcessarFila(pontos, idx, total) {
     }, 200);
   });
 }
-
+  
 function pararVarredura() {
   _vrrParar = true;
   _vrrAtivo = false;
@@ -10107,6 +10117,21 @@ function _vrrConcluir() {
   document.getElementById('vrrResumoAmarelo').textContent = amarelos;
   document.getElementById('vrrResumoVermelho').textContent = vermelhos;
   document.getElementById('vrrResumo').style.display = 'block';
+
+  var totalSV = 0, totalPos = 0, totalBloq = 0;
+  _vrrResultados.forEach(function(r) {
+    totalSV += Number(r.imagensAnalisadas || 0);
+    totalPos += Number(r.imagensPositivas || 0);
+    totalBloq += Number(r.imagensBloqueantes || 0);
+  });
+
+  var elResumoSV = document.getElementById('vrrResumoSV');
+  if (elResumoSV) {
+    elResumoSV.textContent =
+      'Street View analisado: ' + totalSV
+      + ' • positivas: ' + totalPos
+      + ' • bloqueantes: ' + totalBloq;
+  }
 
   document.getElementById('vrrFooter').style.display = verdes > 0 ? 'block' : 'none';
 
@@ -10129,7 +10154,7 @@ function _vrrConcluir() {
 
   cToast(_vrrResultados.length + ' pontos analisados', 'success');
 }
-  
+
 // ── Heat markers ─────────────────────────────────────
 function _vrrAdicionarHeatMarker(r) {
   var cls = _vrrClassificarResultado(r);
@@ -10145,7 +10170,13 @@ function _vrrAdicionarHeatMarker(r) {
       strokeColor: '#fff',
       strokeWeight: 1.5
     },
-    title: cls.badge + ' • Score ' + r.score + (r.aptoFisico ? ' • apto fisico' : ' • reprovado fisico'),
+    title:
+      cls.badge
+      + ' • Score ' + r.score
+      + (r.aptoFisico ? ' • apto fisico' : ' • reprovado fisico')
+      + ' • SV ' + Number(r.imagensAnalisadas || 0)
+      + ' • + ' + Number(r.imagensPositivas || 0)
+      + ' • ! ' + Number(r.imagensBloqueantes || 0),
     zIndex: 200
   });
 
@@ -10223,6 +10254,23 @@ function _vrrAdicionarItemLista(r) {
   var checkDisabled = !r.aptoFisico ? 'disabled' : '';
   var checkTitle = !r.aptoFisico ? 'title="Ponto reprovado fisicamente"' : '';
 
+  var imgA = Number(r.imagensAnalisadas || 0);
+  var imgP = Number(r.imagensPositivas || 0);
+  var imgB = Number(r.imagensBloqueantes || 0);
+
+  var svResumo = '';
+  if (imgA > 0) {
+    svResumo =
+      '<div style="margin-top:6px;padding:6px 8px;border-radius:7px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06)">' +
+        '<div style="font-size:9px;color:rgba(255,255,255,.38);letter-spacing:.08em;margin-bottom:4px">STREET VIEW / IA</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<span style="font-size:10px;color:rgba(255,255,255,.65)">SV: <b style="color:#fff">' + imgA + '</b></span>' +
+          '<span style="font-size:10px;color:#86efac">Positivas: <b>' + imgP + '</b></span>' +
+          '<span style="font-size:10px;color:#fca5a5">Bloqueantes: <b>' + imgB + '</b></span>' +
+        '</div>' +
+      '</div>';
+  }
+
   var div = document.createElement('div');
   div.className = 'vrr-item';
   div.dataset.score = r.score;
@@ -10252,6 +10300,8 @@ function _vrrAdicionarItemLista(r) {
 
     '<div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,.55)">Largura: ' + (r.calcadaLargura || 'indefinido') + '</div>' +
 
+    svResumo +
+
     (obsCalcada
       ? '<div style="margin-top:6px;font-size:10px;line-height:1.35;color:rgba(255,255,255,.58)">' + obsCalcada + '</div>'
       : '') +
@@ -10264,7 +10314,7 @@ function _vrrAdicionarItemLista(r) {
     '</div>';
 
   lista.appendChild(div);
-}
+}  
   
 function _vrrCentralizar(lat, lng) {
   if (!_gmap) return;
