@@ -2595,6 +2595,20 @@ input:focus, select:focus {
     <div style="font-size:11px;color:#60a5fa;font-weight:700;margin-bottom:6px" id="vrrLoteCnt">0 selecionados</div>
     <button onclick="_vrrAdicionarLote()" style="width:100%;padding:8px;border-radius:7px;border:none;background:#2563eb;color:white;font-size:11px;font-weight:700;cursor:pointer">
       Adicionar selecionados em lote
+<button onclick="_vrrTogglePermitirReprovados()" id="vrrBtnPermitirReprovados" style="
+  width:100%;
+  margin-bottom:8px;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid rgba(245,158,11,.25);
+  cursor:pointer;
+  font-size:12px;
+  font-weight:700;
+  background:rgba(245,158,11,.10);
+  color:#fbbf24">
+  Permitir selecionar reprovados manualmente: OFF
+</button>
+
     </button>
   </div>
   <div id="vrrFooter" style="display:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0">
@@ -9909,7 +9923,8 @@ function iniciarVarredura() {
   var distMin  = Number(document.getElementById('vrrDistMin').value) || 100;
   var modoFuros = document.getElementById('vrrModoFuros').checked;
 
-  // Guardar distMin globalmente para uso no filtro
+ // Buraco = ponto sem nenhuma estacao existente OU aprovada a menos de distMin
+ var limFuro = distMin;
   window._vrrDistMin = distMin;
 
   document.getElementById('vrrProgressoDetalhe').textContent = 'Buscando candidatos...';
@@ -9920,7 +9935,7 @@ function iniciarVarredura() {
     if (modoFuros) {
       // No modo furos: so analisa pontos que estejam em "buraco" de cobertura
       // Buraco = ponto sem nenhuma estacao existente OU aprovada a menos de distMin * 2
-      var limFuro = distMin * 2;
+      var limFuro = distMin;
       var aprovados = window._vrrAprovados || [];
       filtrados = filtrados.filter(function(p) {
         var pt = new google.maps.LatLng(p.lat, p.lng);
@@ -10267,6 +10282,64 @@ function _vrrMostrarLegenda() {
 }
 
 // ── Item na lista ─────────────────────────────────────
+var _vrrPermitirReprovados = false;
+
+function _vrrPodeSelecionarManual(r) {
+  return !!(r && (r.aptoFisico || _vrrPermitirReprovados));
+}
+
+function _vrrTogglePermitirReprovados() {
+  _vrrPermitirReprovados = !_vrrPermitirReprovados;
+
+  var btn = document.getElementById('vrrBtnPermitirReprovados');
+  if (btn) {
+    btn.textContent = 'Permitir selecionar reprovados manualmente: ' + (_vrrPermitirReprovados ? 'ON' : 'OFF');
+    btn.style.background = _vrrPermitirReprovados ? 'rgba(245,158,11,.18)' : 'rgba(245,158,11,.10)';
+    btn.style.borderColor = _vrrPermitirReprovados ? 'rgba(245,158,11,.4)' : 'rgba(245,158,11,.25)';
+  }
+
+  document.querySelectorAll('.vrr-item').forEach(function(item) {
+    var aptoFisico = item.dataset.aptoFisico === '1';
+    var chk = item.querySelector('input[type=checkbox]');
+    var btnSel = item.querySelector('.vrr-btn-select');
+
+    if (!chk) return;
+
+    var podeSelecionar = aptoFisico || _vrrPermitirReprovados;
+
+    if (podeSelecionar) {
+      chk.disabled = false;
+      chk.removeAttribute('title');
+
+      if (btnSel) {
+        btnSel.disabled = false;
+        btnSel.textContent = aptoFisico ? 'Selecionar' : 'Selecionar mesmo assim';
+        btnSel.style.cursor = 'pointer';
+        btnSel.style.opacity = '1';
+        btnSel.style.borderColor = aptoFisico ? 'rgba(37,99,235,.25)' : 'rgba(245,158,11,.22)';
+        btnSel.style.background = aptoFisico ? 'rgba(37,99,235,.12)' : 'rgba(245,158,11,.10)';
+        btnSel.style.color = aptoFisico ? '#60a5fa' : '#fbbf24';
+      }
+    } else {
+      chk.checked = false;
+      chk.disabled = true;
+      chk.setAttribute('title', 'Ponto reprovado fisicamente');
+
+      if (btnSel) {
+        btnSel.disabled = true;
+        btnSel.textContent = 'Bloqueado';
+        btnSel.style.cursor = 'not-allowed';
+        btnSel.style.opacity = '0.7';
+        btnSel.style.borderColor = 'rgba(239,68,68,.18)';
+        btnSel.style.background = 'rgba(239,68,68,.08)';
+        btnSel.style.color = '#fca5a5';
+      }
+    }
+  });
+
+  _vrrAtualizarLote();
+}
+
 function _vrrAdicionarItemLista(r) {
   var lista = document.getElementById('vrrLista');
   var cls = _vrrClassificarResultado(r);
@@ -10278,6 +10351,7 @@ function _vrrAdicionarItemLista(r) {
   var svUrl = mapsKey
     ? 'https://maps.googleapis.com/maps/api/streetview?size=280x120&location=' + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
     : '';
+
   var svThumb = svUrl
     ? '<img src="' + svUrl + '" data-fullsrc="' + svUrl.replace('280x120', '800x400') + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
     : '';
@@ -10288,12 +10362,13 @@ function _vrrAdicionarItemLista(r) {
   if (!obsCalcada && !r.aptoFisico) obsCalcada = 'Reprovado fisicamente para implantacao.';
 
   var itemId = 'vrr_' + Math.random().toString(36).substr(2, 8);
-  var checkDisabled = !r.aptoFisico ? 'disabled' : '';
-  var checkTitle = !r.aptoFisico ? 'title="Ponto reprovado fisicamente"' : '';
-
   var imgA = Number(r.imagensAnalisadas || 0);
   var imgP = Number(r.imagensPositivas || 0);
   var imgB = Number(r.imagensBloqueantes || 0);
+
+  var podeSelecionar = _vrrPodeSelecionarManual(r);
+  var checkDisabled = !podeSelecionar ? 'disabled' : '';
+  var checkTitle = !podeSelecionar ? 'title="Ponto reprovado fisicamente"' : '';
 
   var svResumo = '';
   if (imgA > 0) {
@@ -10307,6 +10382,11 @@ function _vrrAdicionarItemLista(r) {
         '</div>' +
       '</div>';
   }
+
+  var corSelect = r.aptoFisico ? '#60a5fa' : '#fbbf24';
+  var bgSelect = r.aptoFisico ? 'rgba(37,99,235,.12)' : 'rgba(245,158,11,.10)';
+  var borderSelect = r.aptoFisico ? 'rgba(37,99,235,.25)' : 'rgba(245,158,11,.22)';
+  var txtSelect = r.aptoFisico ? 'Selecionar' : 'Selecionar mesmo assim';
 
   var div = document.createElement('div');
   div.className = 'vrr-item';
@@ -10345,9 +10425,18 @@ function _vrrAdicionarItemLista(r) {
 
     '<div style="display:flex;gap:6px;margin-top:8px">' +
       '<button type="button" onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:white;font-size:11px;cursor:pointer">Abrir ponto</button>' +
-      (r.aptoFisico
-        ? '<button type="button" onclick="this.closest(\'.vrr-item\').querySelector(\'input[type=checkbox]\').click()" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(37,99,235,.25);background:rgba(37,99,235,.12);color:#60a5fa;font-size:11px;cursor:pointer">Selecionar</button>'
-        : '<button type="button" disabled style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(239,68,68,.18);background:rgba(239,68,68,.08);color:#fca5a5;font-size:11px;cursor:not-allowed">Bloqueado</button>') +
+      '<button type="button" class="vrr-btn-select" ' +
+        (podeSelecionar
+          ? 'onclick="this.closest(\'.vrr-item\').querySelector(\'input[type=checkbox]\').click()" '
+          : 'disabled ') +
+        'style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid ' +
+        (podeSelecionar ? borderSelect : 'rgba(239,68,68,.18)') + ';background:' +
+        (podeSelecionar ? bgSelect : 'rgba(239,68,68,.08)') + ';color:' +
+        (podeSelecionar ? corSelect : '#fca5a5') + ';font-size:11px;cursor:' +
+        (podeSelecionar ? 'pointer' : 'not-allowed') + ';opacity:' +
+        (podeSelecionar ? '1' : '0.7') + '">' +
+        (podeSelecionar ? txtSelect : 'Bloqueado') +
+      '</button>' +
     '</div>';
 
   lista.appendChild(div);
