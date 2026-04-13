@@ -10170,6 +10170,203 @@ function _vrrTentarResgateLateral(lat, lng) {
   });
 }
 
+function _vrrOffsetMeters(lat, lng, dxEast, dyNorth) {
+  var dLat = dyNorth / 111320;
+  var dLng = dxEast / (111320 * Math.cos(lat * Math.PI / 180));
+  return {
+    lat: lat + dLat,
+    lng: lng + dLng
+  };
+}
+
+function _vrrDistM(lat1, lng1, lat2, lng2) {
+  try {
+    if (google && google.maps && google.maps.geometry && google.maps.geometry.spherical) {
+      return google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(lat1, lng1),
+        new google.maps.LatLng(lat2, lng2)
+      );
+    }
+  } catch (e) {}
+
+  var R = 6371000;
+  var toRad = function(v) { return v * Math.PI / 180; };
+  var dLat = toRad(lat2 - lat1);
+  var dLng = toRad(lng2 - lng1);
+  var a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function _vrrConfRank(conf) {
+  conf = String(conf || '').toLowerCase();
+  if (conf === 'alta') return 3;
+  if (conf === 'media') return 2;
+  return 1;
+}
+
+function _vrrMotivoResgatavel(motivo) {
+  motivo = String(motivo || '').toUpperCase();
+  return [
+    'GARAGEM',
+    'ESTACIONAMENTO',
+    'OBSTRUCAO',
+    'CRUZAMENTO',
+    'LARGURA_INSUFICIENTE',
+    'IMAGEM_INSUFICIENTE'
+  ].indexOf(motivo) >= 0;
+}
+
+function _vrrInferirDirecaoVia(lat, lng, pontos) {
+  if (!Array.isArray(pontos) || pontos.length < 3) return null;
+
+  var viz = [];
+  for (var i = 0; i < pontos.length; i++) {
+    var p = pontos[i];
+    if (!p) continue;
+
+    var dist = _vrrDistM(lat, lng, Number(p.lat), Number(p.lng));
+    if (!isFinite(dist) || dist < 8 || dist > 90) continue;
+
+    var dx = (Number(p.lng) - lng) * 111320 * Math.cos(lat * Math.PI / 180);
+    var dy = (Number(p.lat) - lat) * 111320;
+    viz.push({ dx: dx, dy: dy, dist: dist });
+  }
+
+  if (viz.length < 2) return null;
+
+  viz.sort(function(a, b) { return a.dist - b.dist; });
+  viz = viz.slice(0, 8);
+
+  var sxx = 0, syy = 0, sxy = 0;
+  viz.forEach(function(v) {
+    var w = 1 / Math.max(1, v.dist);
+    sxx += w * v.dx * v.dx;
+    syy += w * v.dy * v.dy;
+    sxy += w * v.dx * v.dy;
+  });
+
+  var ang = 0.5 * Math.atan2(2 * sxy, (sxx - syy));
+  var ux = Math.cos(ang);
+  var uy = Math.sin(ang);
+
+  if (!isFinite(ux) || !isFinite(uy)) return null;
+
+  return {
+    ux: ux,
+    uy: uy,
+    px: -uy,
+    py: ux
+  };
+}
+
+function _vrrGerarTentativasResgateV2(lat, lng, pontos) {
+  var dir = _vrrInferirDirecaoVia(lat, lng, pontos);
+
+  if (dir) {
+    return [
+      { dx: dir.ux * 4,  dy: dir.uy * 4,  label: '4m ao longo da via',  tipo: 'via' },
+      { dx: -dir.ux * 4, dy: -dir.uy * 4, label: '4m ao longo da via',  tipo: 'via' },
+      { dx: dir.ux * 8,  dy: dir.uy * 8,  label: '8m ao longo da via',  tipo: 'via' },
+      { dx: -dir.ux * 8, dy: -dir.uy * 8, label: '8m ao longo da via',  tipo: 'via' },
+      { dx: dir.px * 3,  dy: dir.py * 3,  label: '3m lateral da via',   tipo: 'lateral' },
+      { dx: -dir.px * 3, dy: -dir.py * 3, label: '3m lateral da via',   tipo: 'lateral' }
+    ];
+  }
+
+  return [
+    { dx:  4, dy:  0, label: '4m leste', tipo: 'fallback' },
+    { dx: -4, dy:  0, label: '4m oeste', tipo: 'fallback' },
+    { dx:  0, dy:  4, label: '4m norte', tipo: 'fallback' },
+    { dx:  0, dy: -4, label: '4m sul',   tipo: 'fallback' },
+    { dx:  8, dy:  0, label: '8m leste', tipo: 'fallback' },
+    { dx: -8, dy:  0, label: '8m oeste', tipo: 'fallback' }
+  ];
+}
+
+function _vrrMelhorResgateCand(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+
+  var scoreA = Number((a.calcadaRaw && a.calcadaRaw.score) || 0);
+  var scoreB = Number((b.calcadaRaw && b.calcadaRaw.score) || 0);
+  if (scoreB !== scoreA) return scoreB > scoreA ? b : a;
+
+  var confA = _vrrConfRank(a.calcada && a.calcada.confianca);
+  var confB = _vrrConfRank(b.calcada && b.calcada.confianca);
+  if (confB !== confA) return confB > confA ? b : a;
+
+  return Number(b.ajusteDistM || 0) < Number(a.ajusteDistM || 0) ? b : a;
+}
+
+function _vrrTentarResgateV2(lat, lng, pontos) {
+  var tentativas = _vrrGerarTentativasResgateV2(lat, lng, pontos);
+  var melhor = null;
+
+  function passo(i) {
+    if (i >= tentativas.length) {
+      return Promise.resolve(melhor ? {
+        ok: true,
+        lat: melhor.lat,
+        lng: melhor.lng,
+        ajusteLabel: melhor.ajusteLabel,
+        ajusteTipo: melhor.ajusteTipo,
+        ajusteDistM: melhor.ajusteDistM,
+        ajustadoIA: true,
+        calcadaRaw: melhor.calcadaRaw,
+        calcada: melhor.calcada
+      } : { ok: false });
+    }
+
+    var t = tentativas[i];
+    var p = _vrrOffsetMeters(lat, lng, t.dx, t.dy);
+
+    return _vrrScoreCalcada(p.lat, p.lng).then(function(raw) {
+      var calc = _vrrNormalizarCalcadaResultado(raw || {});
+
+      if (calc.aptoFisico) {
+        var cand = {
+          lat: p.lat,
+          lng: p.lng,
+          ajusteLabel: t.label,
+          ajusteTipo: t.tipo,
+          ajusteDistM: Math.round(_vrrDistM(lat, lng, p.lat, p.lng)),
+          calcadaRaw: raw || {},
+          calcada: calc
+        };
+
+        melhor = _vrrMelhorResgateCand(melhor, cand);
+
+        var score = Number((raw && raw.score) || 0);
+        var conf  = _vrrConfRank(calc.confianca);
+
+        if (score >= 34 && conf >= 3) {
+          return {
+            ok: true,
+            lat: melhor.lat,
+            lng: melhor.lng,
+            ajusteLabel: melhor.ajusteLabel,
+            ajusteTipo: melhor.ajusteTipo,
+            ajusteDistM: melhor.ajusteDistM,
+            ajustadoIA: true,
+            calcadaRaw: melhor.calcadaRaw,
+            calcada: melhor.calcada
+          };
+        }
+      }
+
+      return passo(i + 1);
+    }).catch(function() {
+      return passo(i + 1);
+    });
+  }
+
+  return passo(0);
+}
+
 
 
 function _vrrProcessarFila(pontos, idx, total) {
@@ -10186,14 +10383,14 @@ function _vrrProcessarFila(pontos, idx, total) {
 
   var p = pontos[idx];
 
-  function _pushResultado(resultado) {
+  function _next(resultado) {
     _vrrResultados.push(resultado);
     _vrrAdicionarHeatMarker(resultado);
     _vrrAdicionarItemLista(resultado);
 
     setTimeout(function() {
       _vrrProcessarFila(pontos, idx + 1, total);
-    }, 200);
+    }, 180);
   }
 
   function _montarResultado(latFinal, lngFinal, poi, calcadaRaw, calcada, rescueMeta) {
@@ -10203,7 +10400,6 @@ function _vrrProcessarFila(pontos, idx, total) {
     return {
       lat: latFinal,
       lng: lngFinal,
-
       latOriginal: p.lat,
       lngOriginal: p.lng,
 
@@ -10226,6 +10422,7 @@ function _vrrProcessarFila(pontos, idx, total) {
 
       ajustadoIA: !!(rescueMeta && rescueMeta.ajustadoIA),
       ajusteLabel: rescueMeta && rescueMeta.ajusteLabel ? rescueMeta.ajusteLabel : '',
+      ajusteTipo: rescueMeta && rescueMeta.ajusteTipo ? rescueMeta.ajusteTipo : '',
       ajusteDistM: rescueMeta && rescueMeta.ajusteDistM ? Number(rescueMeta.ajusteDistM) : 0
     };
   }
@@ -10241,54 +10438,52 @@ function _vrrProcessarFila(pontos, idx, total) {
     var precisaResgate = !calcada0.aptoFisico && _vrrMotivoResgatavel(calcada0.motivoCodigo);
 
     if (!precisaResgate) {
-      _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+      _next(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
       return;
     }
 
-    _vrrTentarResgateLateral(p.lat, p.lng).then(function(resgate) {
+    _vrrTentarResgateV2(p.lat, p.lng, pontos).then(function(resgate) {
       if (!resgate || !resgate.ok) {
-        _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+        _next(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
         return;
       }
 
       _vrrScorePOIs(resgate.lat, resgate.lng).then(function(poiResgate) {
-        _pushResultado(
-          _montarResultado(
-            resgate.lat,
-            resgate.lng,
-            poiResgate || poi0,
-            resgate.calcadaRaw,
-            resgate.calcada,
-            resgate
-          )
-        );
+        _next(_montarResultado(
+          resgate.lat,
+          resgate.lng,
+          poiResgate || poi0,
+          resgate.calcadaRaw,
+          resgate.calcada,
+          resgate
+        ));
       }).catch(function() {
-        _pushResultado(
-          _montarResultado(
-            resgate.lat,
-            resgate.lng,
-            poi0,
-            resgate.calcadaRaw,
-            resgate.calcada,
-            resgate
-          )
-        );
+        _next(_montarResultado(
+          resgate.lat,
+          resgate.lng,
+          poi0,
+          resgate.calcadaRaw,
+          resgate.calcada,
+          resgate
+        ));
       });
     }).catch(function() {
-      _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+      _next(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
     });
 
   }).catch(function(err) {
     console.warn('Erro na varredura IA:', err);
 
-    var resultadoErro = {
+    var baseScore = Number(_vrrScoreCobertura(p.lat, p.lng) || 0);
+
+    _next({
       lat: p.lat,
       lng: p.lng,
       latOriginal: p.lat,
       lngOriginal: p.lng,
 
-      score: Math.round(Number(_vrrScoreCobertura(p.lat, p.lng) || 0)),
-      scoreCobertura: Number(_vrrScoreCobertura(p.lat, p.lng) || 0),
+      score: Math.round(baseScore),
+      scoreCobertura: baseScore,
       scorePOI: 0,
       scoreCalcada: 0,
       poiCount: 0,
@@ -10306,12 +10501,12 @@ function _vrrProcessarFila(pontos, idx, total) {
 
       ajustadoIA: false,
       ajusteLabel: '',
+      ajusteTipo: '',
       ajusteDistM: 0
-    };
-
-    _pushResultado(resultadoErro);
+    });
   });
 }
+
   
 function pararVarredura() {
   _vrrParar = true;
@@ -10581,6 +10776,7 @@ function _vrrAdicionarItemLista(r) {
   div.dataset.rank = String(cls.rank);
   div.dataset.ajustadoIa = r.ajustadoIA ? '1' : '0';
   div.dataset.ajusteLabel = r.ajusteLabel || '';
+  div.dataset.ajusteTipo = r.ajusteTipo || '';
   div.dataset.ajusteDistM = String(r.ajusteDistM || 0);
 
   div.innerHTML =
@@ -10631,7 +10827,8 @@ function _vrrAdicionarItemLista(r) {
     '</div>';
 
   lista.appendChild(div);
-}  
+}
+  
   
 function _vrrCentralizar(lat, lng) {
   if (!_gmap) return;
@@ -10703,6 +10900,7 @@ function _vrrAtualizarLote() {
       lngOriginal: Number(item.dataset.lngOriginal || item.dataset.lng),
       ajustadoIA: item.dataset.ajustadoIa === '1',
       ajusteLabel: item.dataset.ajusteLabel || '',
+      ajusteTipo: item.dataset.ajusteTipo || '',
       ajusteDistM: Number(item.dataset.ajusteDistM || 0)
     };
   });
