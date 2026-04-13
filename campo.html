@@ -10065,6 +10065,113 @@ function _vrrResumoClasseContagem_(classe) {
   }).length;
 }
 
+
+function _vrrOffsetMeters(lat, lng, dxEast, dyNorth) {
+  var dLat = dyNorth / 111320;
+  var dLng = dxEast / (111320 * Math.cos(lat * Math.PI / 180));
+  return {
+    lat: lat + dLat,
+    lng: lng + dLng
+  };
+}
+
+function _vrrDistM(lat1, lng1, lat2, lng2) {
+  try {
+    if (google && google.maps && google.maps.geometry && google.maps.geometry.spherical) {
+      return google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(lat1, lng1),
+        new google.maps.LatLng(lat2, lng2)
+      );
+    }
+  } catch (e) {}
+
+  var R = 6371000;
+  var toRad = function(v) { return v * Math.PI / 180; };
+  var dLat = toRad(lat2 - lat1);
+  var dLng = toRad(lng2 - lng1);
+  var a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function _vrrConfRank(conf) {
+  conf = String(conf || '').toLowerCase();
+  if (conf === 'alta') return 3;
+  if (conf === 'media') return 2;
+  return 1;
+}
+
+function _vrrMotivoResgatavel(motivo) {
+  motivo = String(motivo || '').toUpperCase();
+  return [
+    'GARAGEM',
+    'ESTACIONAMENTO',
+    'OBSTRUCAO',
+    'CRUZAMENTO',
+    'LARGURA_INSUFICIENTE',
+    'IMAGEM_INSUFICIENTE'
+  ].indexOf(motivo) >= 0;
+}
+
+function _vrrTentarResgateLateral(lat, lng) {
+  // Microajustes curtos ao redor.
+  // Se quiser endurecer custo/performance depois, dá para reduzir para 4 tentativas.
+  var tentativas = [
+    { dx:  4, dy:  0, label: '4m leste'  },
+    { dx: -4, dy:  0, label: '4m oeste'  },
+    { dx:  0, dy:  4, label: '4m norte'  },
+    { dx:  0, dy: -4, label: '4m sul'    },
+    { dx:  8, dy:  0, label: '8m leste'  },
+    { dx: -8, dy:  0, label: '8m oeste'  },
+    { dx:  0, dy:  8, label: '8m norte'  },
+    { dx:  0, dy: -8, label: '8m sul'    }
+  ];
+
+  return Promise.all(
+    tentativas.map(function(t) {
+      var p = _vrrOffsetMeters(lat, lng, t.dx, t.dy);
+      return _vrrScoreCalcada(p.lat, p.lng).then(function(raw) {
+        var calcada = _vrrNormalizarCalcadaResultado(raw || {});
+        return {
+          ok: !!calcada.aptoFisico,
+          lat: p.lat,
+          lng: p.lng,
+          ajusteLabel: t.label,
+          ajusteDistM: Math.round(_vrrDistM(lat, lng, p.lat, p.lng)),
+          calcadaRaw: raw || {},
+          calcada: calcada
+        };
+      });
+    })
+  ).then(function(resultados) {
+    var validos = resultados.filter(function(r) { return r.ok; });
+    if (!validos.length) {
+      return { ok: false };
+    }
+
+    validos.sort(function(a, b) {
+      var scoreA = Number(a.calcadaRaw.score || 0);
+      var scoreB = Number(b.calcadaRaw.score || 0);
+      if (scoreB !== scoreA) return scoreB - scoreA;
+
+      var confA = _vrrConfRank(a.calcada.confianca);
+      var confB = _vrrConfRank(b.calcada.confianca);
+      if (confB !== confA) return confB - confA;
+
+      return a.ajusteDistM - b.ajusteDistM;
+    });
+
+    var melhor = validos[0];
+    melhor.ajustadoIA = true;
+    return melhor;
+  });
+}
+
+
+
 function _vrrProcessarFila(pontos, idx, total) {
   if (_vrrParar || idx >= total) {
     _vrrAtivo = false;
@@ -10078,26 +10185,33 @@ function _vrrProcessarFila(pontos, idx, total) {
   document.getElementById('vrrProgressoLabel').textContent = 'Analisando ponto ' + (idx + 1) + ' de ' + total;
 
   var p = pontos[idx];
-  var scoreCobertura = _vrrScoreCobertura(p.lat, p.lng);
 
-  Promise.all([
-    _vrrScorePOIs(p.lat, p.lng),
-    _vrrScoreCalcada(p.lat, p.lng)
-  ]).then(function(resultados) {
-    var poi = resultados[0] || { score: 0, count: 0 };
-    var calcadaRaw = resultados[1] || {};
-    var calcada = _vrrNormalizarCalcadaResultado(calcadaRaw);
+  function _pushResultado(resultado) {
+    _vrrResultados.push(resultado);
+    _vrrAdicionarHeatMarker(resultado);
+    _vrrAdicionarItemLista(resultado);
 
-    var totalScore = scoreCobertura + Number(poi.score || 0) + Number(calcada.score || 0);
+    setTimeout(function() {
+      _vrrProcessarFila(pontos, idx + 1, total);
+    }, 200);
+  }
 
-    var resultado = {
-      lat: p.lat,
-      lng: p.lng,
+  function _montarResultado(latFinal, lngFinal, poi, calcadaRaw, calcada, rescueMeta) {
+    var scoreCoberturaFinal = _vrrScoreCobertura(latFinal, lngFinal);
+    var totalScore = scoreCoberturaFinal + Number((poi && poi.score) || 0) + Number(calcada.score || 0);
+
+    return {
+      lat: latFinal,
+      lng: lngFinal,
+
+      latOriginal: p.lat,
+      lngOriginal: p.lng,
+
       score: Math.round(totalScore),
-      scoreCobertura: Number(scoreCobertura || 0),
-      scorePOI: Number(poi.score || 0),
+      scoreCobertura: Number(scoreCoberturaFinal || 0),
+      scorePOI: Number((poi && poi.score) || 0),
       scoreCalcada: Number(calcada.score || 0),
-      poiCount: Number(poi.count || 0),
+      poiCount: Number((poi && poi.count) || 0),
 
       calcadaObs: calcada.obs,
       calcadaLargura: calcada.largura,
@@ -10106,26 +10220,75 @@ function _vrrProcessarFila(pontos, idx, total) {
       calcadaConfianca: calcada.confianca,
       calcadaMotivoCodigo: calcada.motivoCodigo,
 
-      imagensAnalisadas: Number(calcadaRaw.imagensAnalisadas || 0),
-      imagensPositivas: Number(calcadaRaw.imagensPositivas || 0),
-      imagensBloqueantes: Number(calcadaRaw.imagensBloqueantes || 0)
+      imagensAnalisadas: Number((calcadaRaw && calcadaRaw.imagensAnalisadas) || 0),
+      imagensPositivas: Number((calcadaRaw && calcadaRaw.imagensPositivas) || 0),
+      imagensBloqueantes: Number((calcadaRaw && calcadaRaw.imagensBloqueantes) || 0),
+
+      ajustadoIA: !!(rescueMeta && rescueMeta.ajustadoIA),
+      ajusteLabel: rescueMeta && rescueMeta.ajusteLabel ? rescueMeta.ajusteLabel : '',
+      ajusteDistM: rescueMeta && rescueMeta.ajusteDistM ? Number(rescueMeta.ajusteDistM) : 0
     };
+  }
 
-    _vrrResultados.push(resultado);
-    _vrrAdicionarHeatMarker(resultado);
-    _vrrAdicionarItemLista(resultado);
+  Promise.all([
+    _vrrScorePOIs(p.lat, p.lng),
+    _vrrScoreCalcada(p.lat, p.lng)
+  ]).then(function(resultados) {
+    var poi0 = resultados[0] || { score: 0, count: 0 };
+    var calcadaRaw0 = resultados[1] || {};
+    var calcada0 = _vrrNormalizarCalcadaResultado(calcadaRaw0);
 
-    setTimeout(function() {
-      _vrrProcessarFila(pontos, idx + 1, total);
-    }, 200);
+    var precisaResgate = !calcada0.aptoFisico && _vrrMotivoResgatavel(calcada0.motivoCodigo);
+
+    if (!precisaResgate) {
+      _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+      return;
+    }
+
+    _vrrTentarResgateLateral(p.lat, p.lng).then(function(resgate) {
+      if (!resgate || !resgate.ok) {
+        _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+        return;
+      }
+
+      _vrrScorePOIs(resgate.lat, resgate.lng).then(function(poiResgate) {
+        _pushResultado(
+          _montarResultado(
+            resgate.lat,
+            resgate.lng,
+            poiResgate || poi0,
+            resgate.calcadaRaw,
+            resgate.calcada,
+            resgate
+          )
+        );
+      }).catch(function() {
+        _pushResultado(
+          _montarResultado(
+            resgate.lat,
+            resgate.lng,
+            poi0,
+            resgate.calcadaRaw,
+            resgate.calcada,
+            resgate
+          )
+        );
+      });
+    }).catch(function() {
+      _pushResultado(_montarResultado(p.lat, p.lng, poi0, calcadaRaw0, calcada0, null));
+    });
+
   }).catch(function(err) {
     console.warn('Erro na varredura IA:', err);
 
     var resultadoErro = {
       lat: p.lat,
       lng: p.lng,
-      score: Math.round(Number(scoreCobertura || 0)),
-      scoreCobertura: Number(scoreCobertura || 0),
+      latOriginal: p.lat,
+      lngOriginal: p.lng,
+
+      score: Math.round(Number(_vrrScoreCobertura(p.lat, p.lng) || 0)),
+      scoreCobertura: Number(_vrrScoreCobertura(p.lat, p.lng) || 0),
       scorePOI: 0,
       scoreCalcada: 0,
       poiCount: 0,
@@ -10139,16 +10302,14 @@ function _vrrProcessarFila(pontos, idx, total) {
 
       imagensAnalisadas: 0,
       imagensPositivas: 0,
-      imagensBloqueantes: 0
+      imagensBloqueantes: 0,
+
+      ajustadoIA: false,
+      ajusteLabel: '',
+      ajusteDistM: 0
     };
 
-    _vrrResultados.push(resultadoErro);
-    _vrrAdicionarHeatMarker(resultadoErro);
-    _vrrAdicionarItemLista(resultadoErro);
-
-    setTimeout(function() {
-      _vrrProcessarFila(pontos, idx + 1, total);
-    }, 200);
+    _pushResultado(resultadoErro);
   });
 }
   
@@ -10227,6 +10388,7 @@ function _vrrAdicionarHeatMarker(r) {
       cls.badge
       + ' • Score ' + r.score
       + (r.aptoFisico ? ' • apto fisico' : ' • reprovado fisico')
+      + (r.ajustadoIA ? ' • ajustado: ' + (r.ajusteLabel || '') : '')
       + ' • SV ' + Number(r.imagensAnalisadas || 0)
       + ' • + ' + Number(r.imagensPositivas || 0)
       + ' • ! ' + Number(r.imagensBloqueantes || 0),
@@ -10384,6 +10546,25 @@ function _vrrAdicionarItemLista(r) {
       '</div>';
   }
 
+  var ajusteHtml = '';
+  if (r.ajustadoIA) {
+    ajusteHtml =
+      '<div style="margin-top:6px;padding:7px 8px;border-radius:7px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.22)">' +
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+          '<span style="font-size:9px;font-weight:800;letter-spacing:.06em;color:#93c5fd">AJUSTADO PELA IA</span>' +
+          '<span style="font-size:10px;color:white">' + (r.ajusteLabel || 'microajuste') + '</span>' +
+          '<span style="font-size:10px;color:rgba(255,255,255,.55)">(' + Number(r.ajusteDistM || 0) + 'm)</span>' +
+        '</div>' +
+        '<div style="margin-top:4px;font-size:10px;color:rgba(255,255,255,.58)">Original: '
+          + Number(r.latOriginal || r.lat).toFixed(5) + ', ' + Number(r.lngOriginal || r.lng).toFixed(5) +
+        '</div>' +
+      '</div>';
+  }
+
+  var badgeAjuste = r.ajustadoIA
+    ? '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:rgba(59,130,246,.15);color:#93c5fd;letter-spacing:.05em">AJUSTADO</span>'
+    : '';
+
   var corSelect = r.aptoFisico ? '#60a5fa' : '#fbbf24';
   var bgSelect = r.aptoFisico ? 'rgba(37,99,235,.12)' : 'rgba(245,158,11,.10)';
   var borderSelect = r.aptoFisico ? 'rgba(37,99,235,.25)' : 'rgba(245,158,11,.22)';
@@ -10394,15 +10575,23 @@ function _vrrAdicionarItemLista(r) {
   div.dataset.score = r.score;
   div.dataset.lat = r.lat;
   div.dataset.lng = r.lng;
+  div.dataset.latOriginal = r.latOriginal || r.lat;
+  div.dataset.lngOriginal = r.lngOriginal || r.lng;
   div.dataset.aptoFisico = r.aptoFisico ? '1' : '0';
   div.dataset.rank = String(cls.rank);
+  div.dataset.ajustadoIa = r.ajustadoIA ? '1' : '0';
+  div.dataset.ajusteLabel = r.ajusteLabel || '';
+  div.dataset.ajusteDistM = String(r.ajusteDistM || 0);
 
   div.innerHTML =
     svThumb +
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
       '<input type="checkbox" id="' + itemId + '" ' + checkDisabled + ' ' + checkTitle + ' style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">' +
       '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>' +
-      '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + ';margin-left:auto">' + badge + '</span>' +
+      '<div style="margin-left:auto;display:flex;gap:4px;align-items:center">' +
+        badgeAjuste +
+        '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + '">' + badge + '</span>' +
+      '</div>' +
     '</div>' +
 
     '<div class="vrr-score-bar" style="background:' + cor + ';width:' + Math.max(4, Math.min(100, r.score)) + '%"></div>' +
@@ -10418,6 +10607,7 @@ function _vrrAdicionarItemLista(r) {
 
     '<div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,.55)">Largura: ' + (r.calcadaLargura || 'indefinido') + '</div>' +
 
+    ajusteHtml +
     svResumo +
 
     (obsCalcada
@@ -10503,10 +10693,20 @@ function _vrrRecusar(btn, lat, lng) {
 var _vrrSelecao = [];
 function _vrrAtualizarLote() {
   var checks = document.querySelectorAll('.vrr-item input[type=checkbox]:checked');
+
   _vrrSelecao = Array.from(checks).map(function(c) {
     var item = c.closest('.vrr-item');
-    return { lat: Number(item.dataset.lat), lng: Number(item.dataset.lng) };
+    return {
+      lat: Number(item.dataset.lat),
+      lng: Number(item.dataset.lng),
+      latOriginal: Number(item.dataset.latOriginal || item.dataset.lat),
+      lngOriginal: Number(item.dataset.lngOriginal || item.dataset.lng),
+      ajustadoIA: item.dataset.ajustadoIa === '1',
+      ajusteLabel: item.dataset.ajusteLabel || '',
+      ajusteDistM: Number(item.dataset.ajusteDistM || 0)
+    };
   });
+
   var bar = document.getElementById('vrrLoteBar');
   if (bar) {
     bar.style.display = _vrrSelecao.length > 0 ? 'block' : 'none';
