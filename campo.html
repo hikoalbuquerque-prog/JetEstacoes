@@ -10976,7 +10976,12 @@ function mlpAnalisarIA() {
 
   // GAS faz tudo: Street View + Gemini server-side
   // Browser so envia lat/lng
-  _gasRun('analisarCalcadaIA', { lat: lat, lng: lng },
+  _gasRun('analisarCalcadaIA', {
+    lat: lat,
+    lng: lng,
+    amostras: 8,
+    contexto: 'local_prioritario'
+  },
     function(res) {
       if (!res || !res.ok) {
         _exibirResultadoIA_({
