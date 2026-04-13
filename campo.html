@@ -9829,25 +9829,58 @@ function _vrrScorePOIs(lat, lng) {
 // ── Analise de calcada via GAS + Claude ──────────────
 function _vrrScoreCalcada(lat, lng) {
   return new Promise(function(resolve) {
-    _gasRun('analisarCalcadaIA', { lat: lat, lng: lng },
+    _gasRun('analisarCalcadaIA', {
+        lat: lat,
+        lng: lng,
+        amostras: 8,
+        contexto: 'varredura'
+      },
       function(res) {
         if (!res || !res.ok || !res.resultado) {
-          resolve({ score: 0, aprovado: null, obs: res && res.error ? res.error : 'Sem Street View' });
+          resolve({
+            score: 0,
+            aprovado: null,
+            obs: res && res.error ? res.error : 'Sem Street View',
+            largura: 'indefinido',
+            confianca: 'baixa',
+            motivoCodigo: 'IMAGEM_INSUFICIENTE',
+            imagensAnalisadas: 0,
+            imagensPositivas: 0,
+            imagensBloqueantes: 0
+          });
           return;
         }
+
         var r = res.resultado;
         resolve({
           score: Math.min(40, Math.max(0, Number(r.score) || 0)),
           aprovado: r.aprovado,
           obs: r.observacoes || '',
-          largura: r.larguraEstimada || ''
+          largura: r.larguraEstimada || 'indefinido',
+          confianca: r.confianca || 'baixa',
+          motivoCodigo: r.motivoCodigo || '',
+          imagensAnalisadas: Number(r.imagensAnalisadas || 0),
+          imagensPositivas: Number(r.imagensPositivas || 0),
+          imagensBloqueantes: Number(r.imagensBloqueantes || 0)
         });
       },
-      function(){ resolve({ score: 0, aprovado: null, obs: 'Erro GAS' }); }
+      function() {
+        resolve({
+          score: 0,
+          aprovado: null,
+          obs: 'Erro GAS',
+          largura: 'indefinido',
+          confianca: 'baixa',
+          motivoCodigo: 'IMAGEM_INSUFICIENTE',
+          imagensAnalisadas: 0,
+          imagensPositivas: 0,
+          imagensBloqueantes: 0
+        });
+      }
     );
   });
 }
-
+  
 // ── Iniciar varredura ────────────────────────────────
 function iniciarVarredura() {
   if (_vrrAtivo) return;
