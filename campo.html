@@ -9537,6 +9537,7 @@ function _vrrFiltrarPontos(pontos) {
 // Retorna nos de: calcadas, esquinas comerciais, entradas de comercio,
 // pontos de referencia, paradas de bus (com calcada lateral)
 
+
 function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   var lat = centro.lat();
   var lng = centro.lng();
@@ -9724,6 +9725,7 @@ function _vrrMostrarPinsOSM(pontos) {
     _vrrOSMMarkers.push(m);
   });
 }
+
 
 
 function _vrrGerarGrid(centro, raioMetros, stepMetros) {
