@@ -9536,18 +9536,23 @@ function _vrrFiltrarPontos(pontos) {
 // ── Buscar candidatos reais via OSM Overpass ─────────────────────
 // Retorna nos de: calcadas, esquinas comerciais, entradas de comercio,
 // pontos de referencia, paradas de bus (com calcada lateral)
-function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
+function _function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
   var lat = centro.lat();
   var lng = centro.lng();
 
   var query = '[out:json][timeout:15];('
-    + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["shop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Amenidades com demanda real
+    + 'node["amenity"~"restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace|clinic|college"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Comercio mais relevante
+    + 'node["shop"~"mall|supermarket|department_store|convenience|bakery|clothes|electronics|shopping_centre"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Escritorios / trabalho
     + 'node["office"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["public_transport"~"platform|stop_position"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Transporte mais forte
+    + 'node["public_transport"="platform"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + 'node["railway"~"station|subway_entrance|tram_stop"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["tourism"~"attraction|museum|gallery"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
-    + 'node["leisure"~"park|fitness_station"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    // Turismo/lazer com potencial, mas menos prioridade
+    + 'node["tourism"~"attraction|museum|gallery|hotel|hostel|motel"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
+    + 'node["leisure"~"fitness_centre|sports_centre"](around:' + raioMetros + ',' + lat + ',' + lng + ');'
     + ');out center 120;';
 
   var urls = [
@@ -9555,6 +9560,51 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
     'https://overpass.kumi.systems/api/interpreter',
     'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ];
+
+  function distM_(aLat, aLng, bLat, bLng) {
+    var p1 = new google.maps.LatLng(aLat, aLng);
+    var p2 = new google.maps.LatLng(bLat, bLng);
+    return google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
+  }
+
+  function prioridadeBase_(tags) {
+    var am = String(tags.amenity || '').toLowerCase();
+    var sh = String(tags.shop || '').toLowerCase();
+    var of = String(tags.office || '').toLowerCase();
+    var pt = String(tags.public_transport || '').toLowerCase();
+    var rw = String(tags.railway || '').toLowerCase();
+    var to = String(tags.tourism || '').toLowerCase();
+    var le = String(tags.leisure || '').toLowerCase();
+
+    if (rw === 'station' || rw === 'subway_entrance') return 100;
+    if (pt === 'platform' || rw === 'tram_stop') return 90;
+
+    if (/restaurant|cafe|bank|pharmacy|hospital|clinic|cinema|theatre|marketplace/.test(am)) return 80;
+    if (/school|university|college/.test(am)) return 72;
+
+    if (/mall|supermarket|department_store|shopping_centre/.test(sh)) return 75;
+    if (/convenience|bakery|clothes|electronics/.test(sh)) return 65;
+
+    if (of) return 58;
+
+    if (/hotel|hostel|motel/.test(to)) return 60;
+    if (/attraction|museum|gallery/.test(to)) return 48;
+
+    if (/fitness_centre|sports_centre/.test(le)) return 45;
+
+    return 0;
+  }
+
+  function categoria_(tags) {
+    if (tags.railway) return 'transporte';
+    if (tags.public_transport) return 'transporte';
+    if (tags.amenity) return 'amenity';
+    if (tags.shop) return 'shop';
+    if (tags.office) return 'office';
+    if (tags.tourism) return 'tourism';
+    if (tags.leisure) return 'leisure';
+    return 'outro';
+  }
 
   function tryUrl(idx) {
     if (idx >= urls.length) {
@@ -9570,31 +9620,70 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
       })
       .then(function(data) {
         var pontos = [];
-        var vistos = {};
+        var vistos = [];
 
         (data.elements || []).forEach(function(el) {
           var lat2 = el.lat || (el.center && el.center.lat);
           var lng2 = el.lon || (el.center && el.center.lon);
           if (!lat2 || !lng2) return;
 
-          var chave = lat2.toFixed(4) + ',' + lng2.toFixed(4);
-          if (vistos[chave]) return;
-          vistos[chave] = true;
-
           var tags = el.tags || {};
-          var prioridade = 1;
+          var base = prioridadeBase_(tags);
+          if (base <= 0) return;
 
-          if (tags.railway) prioridade = 5;
-          else if (tags.public_transport === 'platform') prioridade = 4;
-          else if (tags.amenity && /restaurant|cafe|bank|pharmacy|school|university|hospital|cinema|theatre|marketplace/.test(tags.amenity)) prioridade = 4;
-          else if (tags.shop || tags.office) prioridade = 3;
-          else prioridade = 0;
-          
-          pontos.push({ lat: lat2, lng: lng2, prioridade: prioridade, tags: tags });
+          // Dedup espacial real: evita pontos quase colados
+          var repetido = vistos.some(function(v) {
+            return distM_(lat2, lng2, v.lat, v.lng) < 22;
+          });
+          if (repetido) return;
+          vistos.push({ lat: lat2, lng: lng2 });
+
+          var nome = String(tags.name || '').trim();
+          var cat = categoria_(tags);
+
+          // Se for categoria fraca e sem nome, corta
+          if (!nome && (cat === 'office' || cat === 'tourism' || cat === 'leisure')) {
+            return;
+          }
+
+          var dist = distM_(lat, lng, lat2, lng2);
+
+          // Bônus por proximidade
+          var bonusDist = 0;
+          if (dist <= 80) bonusDist = 18;
+          else if (dist <= 140) bonusDist = 12;
+          else if (dist <= 220) bonusDist = 7;
+          else if (dist <= 320) bonusDist = 3;
+
+          // Bônus por nome conhecido
+          var bonusNome = nome ? 6 : 0;
+
+          // Penalidade para categorias menos fortes
+          var penal = 0;
+          if (cat === 'tourism') penal += 8;
+          if (cat === 'leisure') penal += 10;
+          if (cat === 'office') penal += 6;
+
+          var prioridadeFinal = base + bonusDist + bonusNome - penal;
+
+          pontos.push({
+            lat: lat2,
+            lng: lng2,
+            prioridade: prioridadeFinal,
+            prioridadeBase: base,
+            distancia: Math.round(dist),
+            categoria: cat,
+            tags: tags
+          });
         });
 
-        pontos.sort(function(a, b) { return b.prioridade - a.prioridade; });
-        if (pontos.length > 60) pontos = pontos.slice(0, 60);
+        pontos.sort(function(a, b) {
+          if (b.prioridade !== a.prioridade) return b.prioridade - a.prioridade;
+          return a.distancia - b.distancia;
+        });
+
+        // corta mais agressivo
+        if (pontos.length > 40) pontos = pontos.slice(0, 40);
 
         _vrrMostrarPinsOSM(pontos);
         callback(pontos);
@@ -9606,6 +9695,7 @@ function _vrrBuscarCandidatosOSM(centro, raioMetros, callback) {
 
   tryUrl(0);
 }
+
 // Mostrar pins OSM no mapa como contexto visual (azul pequeno)
 var _vrrOSMMarkers = [];
 function _vrrMostrarPinsOSM(pontos) {
@@ -9624,9 +9714,11 @@ function _vrrMostrarPinsOSM(pontos) {
         fillOpacity: 0.5,
         strokeColor: '#3b82f6',
         strokeWeight: 1
-      },
-      title: (p.tags && (p.tags.name || p.tags.amenity || p.tags.shop || p.tags.highway)) || 'Candidato OSM',
-      zIndex: 100,
+        },
+  title:
+    ((p.tags && (p.tags.name || p.tags.amenity || p.tags.shop || p.tags.office || p.tags.railway || p.tags.public_transport)) || 'Candidato OSM')
+    + ' • ' + (p.distancia || '?') + 'm'
+  zIndex: 100,
       clickable: false
     });
     _vrrOSMMarkers.push(m);
