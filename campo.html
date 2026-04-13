@@ -10007,56 +10007,65 @@ function _vrrConcluir() {
   document.getElementById('vrrProgresso').style.display = 'none';
   document.getElementById('vrrBtnIniciar').disabled = false;
 
-  var verdes    = _vrrResultados.filter(function(r){ return r.score >= 70; }).length;
-  var amarelos  = _vrrResultados.filter(function(r){ return r.score >= 40 && r.score < 70; }).length;
-  var vermelhos = _vrrResultados.filter(function(r){ return r.score < 40; }).length;
+  var verdes = _vrrResumoClasseContagem_('OTIMO');
+  var amarelos = _vrrResumoClasseContagem_('POSSIVEL');
+  var vermelhos = _vrrResumoClasseContagem_('RUIM');
 
-  document.getElementById('vrrResumoVerde').textContent   = verdes;
-  document.getElementById('vrrResumoAmarelo').textContent  = amarelos;
+  document.getElementById('vrrResumoVerde').textContent = verdes;
+  document.getElementById('vrrResumoAmarelo').textContent = amarelos;
   document.getElementById('vrrResumoVermelho').textContent = vermelhos;
   document.getElementById('vrrResumo').style.display = 'block';
 
-  if (verdes > 0) document.getElementById('vrrFooter').style.display = 'block';
+  document.getElementById('vrrFooter').style.display = verdes > 0 ? 'block' : 'none';
 
-  // Ordenar lista por score decrescente
   var lista = document.getElementById('vrrLista');
   var items = Array.from(lista.children);
+
   items.sort(function(a, b) {
-    return Number(b.dataset.score || 0) - Number(a.dataset.score || 0);
+    var rankA = Number(a.dataset.rank || 0);
+    var rankB = Number(b.dataset.rank || 0);
+    if (rankA !== rankB) return rankB - rankA;
+
+    var scoreA = Number(a.dataset.score || 0);
+    var scoreB = Number(b.dataset.score || 0);
+    return scoreB - scoreA;
   });
-  items.forEach(function(item){ lista.appendChild(item); });
+
+  items.forEach(function(item) {
+    lista.appendChild(item);
+  });
 
   cToast(_vrrResultados.length + ' pontos analisados', 'success');
 }
-
+  
 // ── Heat markers ─────────────────────────────────────
 function _vrrAdicionarHeatMarker(r) {
-  var cor = r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#ef4444';
+  var cls = _vrrClassificarResultado(r);
+
   var marker = new google.maps.Marker({
     position: { lat: r.lat, lng: r.lng },
     map: _gmap,
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
       scale: 10,
-      fillColor: cor,
+      fillColor: cls.cor,
       fillOpacity: 0.85,
       strokeColor: '#fff',
       strokeWeight: 1.5
     },
-    title: 'Score: ' + r.score,
+    title: cls.badge + ' • Score ' + r.score + (r.aptoFisico ? ' • apto fisico' : ' • reprovado fisico'),
     zIndex: 200
   });
-  marker.addListener('click', function(){
+
+  marker.addListener('click', function() {
     _vrrAdicionarPonto(r.lat, r.lng);
   });
+
   r.__marker = marker;
   _vrrHeatMarkers.push(marker);
   _vrrMostrarLegenda();
 }
-
-// Marcadores de aprovados (pin verde estrela -- persistem apos fechar painel)
-var _vrrAprovadosMarkers = [];
-
+  
 function _vrrMarcarAprovado(lat, lng, label) {
   var gmap = window._gmap;
   if (!gmap) return;
@@ -10100,54 +10109,71 @@ function _vrrMostrarLegenda() {
 // ── Item na lista ─────────────────────────────────────
 function _vrrAdicionarItemLista(r) {
   var lista = document.getElementById('vrrLista');
-  var cor     = r.score >= 70 ? '#10b981' : r.score >= 40 ? '#f59e0b' : '#ef4444';
-  var badge   = r.score >= 70 ? 'OTIMO' : r.score >= 40 ? 'POSSIVEL' : 'RUIM';
-  var bgBadge = r.score >= 70 ? 'rgba(16,185,129,.15)' : r.score >= 40 ? 'rgba(245,158,11,.15)' : 'rgba(239,68,68,.15)';
+  var cls = _vrrClassificarResultado(r);
+  var cor = cls.cor;
+  var badge = cls.badge;
+  var bgBadge = cls.bgBadge;
 
-  // Thumbnail Street View clicavel para fullscreen
   var mapsKey = window._MAPS_KEY || window.MAPS_KEY || '';
   var svUrl = mapsKey
     ? 'https://maps.googleapis.com/maps/api/streetview?size=280x120&location=' + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
     : '';
   var svThumb = svUrl
-    ? '<img src="' + svUrl + '" data-fullsrc="' + svUrl.replace('280x120','800x400') + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
+    ? '<img src="' + svUrl + '" data-fullsrc="' + svUrl.replace('280x120', '800x400') + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
     : '';
 
-  // Filtrar obs de erro generico
   var obsCalcada = r.calcadaObs || '';
   if (obsCalcada === 'Coords invalidas' || obsCalcada === 'Erro GAS') obsCalcada = '';
   if (obsCalcada === 'Sem Street View') obsCalcada = 'Sem imagem disponivel neste local';
+  if (!obsCalcada && !r.aptoFisico) obsCalcada = 'Reprovado fisicamente para implantacao.';
 
-  // ID unico para checkbox
-  var itemId = 'vrr_' + Math.random().toString(36).substr(2,8);
+  var itemId = 'vrr_' + Math.random().toString(36).substr(2, 8);
+  var checkDisabled = !r.aptoFisico ? 'disabled' : '';
+  var checkTitle = !r.aptoFisico ? 'title="Ponto reprovado fisicamente"' : '';
 
   var div = document.createElement('div');
   div.className = 'vrr-item';
   div.dataset.score = r.score;
   div.dataset.lat = r.lat;
   div.dataset.lng = r.lng;
-  div.innerHTML = svThumb
-    + '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
-    +   '<input type="checkbox" id="' + itemId + '" style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">'
-    +   '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>'
-    +   '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + ';margin-left:auto">' + badge + '</span>'
-    + '</div>'
-    + '<div class="vrr-score-bar" style="background:' + cor + ';width:' + r.score + '%"></div>'
-    + '<div style="display:flex;gap:6px;margin-top:5px">'
-    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">Calcada: ' + r.scoreCalcada + '/40</span>'
-    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">POIs: ' + r.scorePOI + '/30</span>'
-    +   '<span style="font-size:9px;color:rgba(255,255,255,.35)">Dist: ' + r.scoreCobertura + '/30</span>'
-    + '</div>'
-    + (obsCalcada ? '<div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:3px;font-style:italic">' + obsCalcada + '</div>' : '')
-    + '<div style="margin-top:6px;display:flex;gap:4px">'
-    +   '<button onclick="_vrrCentralizar(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:4px 2px;border-radius:6px;border:none;background:rgba(255,255,255,.06);color:rgba(255,255,255,.5);font-size:10px;cursor:pointer">Ver</button>'
-    +   (r.score >= 40 ? '<button onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:4px 2px;border-radius:6px;border:none;background:' + cor + ';color:white;font-size:10px;font-weight:700;cursor:pointer">+ Add</button>' : '')
-    +   '<button onclick="_vrrRecusar(this,' + r.lat + ',' + r.lng + ')" title="Recusar - dar feedback" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(239,68,68,.3);background:transparent;color:rgba(239,68,68,.6);font-size:10px;cursor:pointer">x</button>'
-    + '</div>';
+  div.dataset.aptoFisico = r.aptoFisico ? '1' : '0';
+  div.dataset.rank = String(cls.rank);
+
+  div.innerHTML =
+    svThumb +
+    '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
+      '<input type="checkbox" id="' + itemId + '" ' + checkDisabled + ' ' + checkTitle + ' style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">' +
+      '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>' +
+      '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + ';margin-left:auto">' + badge + '</span>' +
+    '</div>' +
+
+    '<div class="vrr-score-bar" style="background:' + cor + ';width:' + Math.max(4, Math.min(100, r.score)) + '%"></div>' +
+
+    '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Cobertura: ' + r.scoreCobertura + '</span>' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">POI: ' + r.scorePOI + '</span>' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Calcada: ' + r.scoreCalcada + '</span>' +
+      '<span style="font-size:9px;color:' + (r.aptoFisico ? '#10b981' : '#ef4444') + ';font-weight:700">' +
+        (r.aptoFisico ? 'APTO FISICO' : 'REPROVADO FISICO') +
+      '</span>' +
+    '</div>' +
+
+    '<div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,.55)">Largura: ' + (r.calcadaLargura || 'indefinido') + '</div>' +
+
+    (obsCalcada
+      ? '<div style="margin-top:6px;font-size:10px;line-height:1.35;color:rgba(255,255,255,.58)">' + obsCalcada + '</div>'
+      : '') +
+
+    '<div style="display:flex;gap:6px;margin-top:8px">' +
+      '<button type="button" onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:white;font-size:11px;cursor:pointer">Abrir ponto</button>' +
+      (r.aptoFisico
+        ? '<button type="button" onclick="this.closest(\'.vrr-item\').querySelector(\'input[type=checkbox]\').click()" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(37,99,235,.25);background:rgba(37,99,235,.12);color:#60a5fa;font-size:11px;cursor:pointer">Selecionar</button>'
+        : '<button type="button" disabled style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(239,68,68,.18);background:rgba(239,68,68,.08);color:#fca5a5;font-size:11px;cursor:not-allowed">Bloqueado</button>') +
+    '</div>';
 
   lista.appendChild(div);
 }
-
+  
 function _vrrCentralizar(lat, lng) {
   if (!_gmap) return;
   _gmap.panTo({ lat: lat, lng: lng });
@@ -10482,21 +10508,27 @@ function _vrrAdicionarPonto(lat, lng) {
 }
 
 function vrrAdicionarAprovados() {
-  // Marcar checkboxes de todos os itens com score >= 70 e abrir modal
   var marcados = 0;
+
   document.querySelectorAll('.vrr-item').forEach(function(item) {
     var score = Number(item.dataset.score || 0);
+    var aptoFisico = item.dataset.aptoFisico === '1';
     var chk = item.querySelector('input[type=checkbox]');
-    if (score >= 70 && chk && !chk.disabled) {
+
+    if (aptoFisico && score >= 70 && chk && !chk.disabled) {
       chk.checked = true;
       marcados++;
+    } else if (chk) {
+      chk.checked = false;
     }
   });
+
   _vrrAtualizarLote();
+
   if (marcados > 0) {
-    _vrrAdicionarLote(); // abre o modal de confirmacao
+    _vrrAdicionarLote();
   } else {
-    cToast('Nenhum ponto otimo disponivel para adicionar', 'warn');
+    cToast('Nenhum ponto fisicamente apto e ótimo disponível para adicionar', 'warn');
   }
 }
 
