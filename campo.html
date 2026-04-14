@@ -9878,51 +9878,91 @@ var _overpassRateLimit = false;
 
 function _vrrScorePOIs(lat, lng) {
   return new Promise(function(resolve) {
-    // Se rate-limited, retorna score neutro imediatamente
-    if (_overpassRateLimit) { resolve({ score: 15, count: 0, cached: true }); return; }
+    lat = Number(lat);
+    lng = Number(lng);
 
-    // Cache por grade (arredonda 3 casas decimais ~111m)
+    if (!isFinite(lat) || !isFinite(lng)) {
+      resolve({ score: 0, count: 0 });
+      return;
+    }
+
+    // Enquanto Street View manual estiver aberto, nao bater Overpass
+    if (_svAjusteAberto) {
+      resolve({ score: 15, count: 0 });
+      return;
+    }
+
+    window._overpassCache = window._overpassCache || {};
+    window._overpassRateLimit = window._overpassRateLimit || false;
+
     var cacheKey = lat.toFixed(3) + ',' + lng.toFixed(3);
-    if (_overpassCache[cacheKey]) { resolve(_overpassCache[cacheKey]); return; }
+    if (_overpassCache[cacheKey]) {
+      resolve(_overpassCache[cacheKey]);
+      return;
+    }
 
-    var query = '[out:json][timeout:8];('
+    // Se Overpass ja estiver ruim/rate-limited, usar score neutro
+    if (_overpassRateLimit) {
+      resolve({ score: 15, count: 0 });
+      return;
+    }
+
+    var query = '[out:json][timeout:6];('
       + 'node["amenity"~"restaurant|cafe|gym|school|bank"](around:200,' + lat + ',' + lng + ');'
       + 'node["tourism"~"hotel"](around:200,' + lat + ',' + lng + ');'
       + 'node["shop"~"mall|supermarket"](around:200,' + lat + ',' + lng + ');'
       + ');out count;';
 
-    // Tentar overpass turbo primeiro, fallback kumi
     var urls = [
       'https://overpass-api.de/api/interpreter?data=',
       'https://overpass.kumi.systems/api/interpreter?data='
     ];
-    var tried = 0;
+
+    function finish(result) {
+      _overpassCache[cacheKey] = result;
+      resolve(result);
+    }
 
     function tryUrl(idx) {
-      if (idx >= urls.length) { resolve({ score: 15, count: 0 }); return; }
+      if (idx >= urls.length) {
+        finish({ score: 15, count: 0 });
+        return;
+      }
+
       fetch(urls[idx] + encodeURIComponent(query))
         .then(function(r) {
-          if (r.status === 429) {
-            // Rate limit -- marcar por 30s e usar score neutro
-            _overpassRateLimit = true;
-            setTimeout(function(){ _overpassRateLimit = false; }, 30000);
-            tryUrl(idx + 1);
-            return null;
+          if (!r.ok) {
+            if (r.status === 429 || r.status === 403 || r.status === 504) {
+              _overpassRateLimit = true;
+              setTimeout(function() { _overpassRateLimit = false; }, 30000);
+            }
+            throw new Error('HTTP ' + r.status);
           }
           return r.text();
         })
         .then(function(text) {
-          if (!text) return;
+          if (!text) {
+            finish({ score: 15, count: 0 });
+            return;
+          }
+
           var data;
-          try { data = JSON.parse(text); } catch(e) { resolve({ score: 10, count: 0 }); return; }
+          try {
+            data = JSON.parse(text);
+          } catch (e) {
+            finish({ score: 10, count: 0 });
+            return;
+          }
+
           var count = (data.elements && data.elements[0] && data.elements[0].tags && data.elements[0].tags.total)
             ? Number(data.elements[0].tags.total) : 0;
+
           var score = count === 0 ? 5 : count <= 2 ? 15 : count <= 5 ? 22 : 30;
-          var result = { score: score, count: count };
-          _overpassCache[cacheKey] = result;
-          resolve(result);
+          finish({ score: score, count: count });
         })
-        .catch(function(){ tryUrl(idx + 1); });
+        .catch(function() {
+          tryUrl(idx + 1);
+        });
     }
 
     tryUrl(0);
@@ -10875,7 +10915,10 @@ function _mlpAbrirStreetViewManual() {
   });
 }
 
+var _svAjusteAberto = false;
+
 function _svAjusteAbrir(ctx) {
+_svAjusteAberto = true;
   if (!window.google || !window.google.maps || !window.google.maps.StreetViewPanorama) {
     cToast('Street View indisponível.', 'warn');
     return;
@@ -11000,6 +11043,7 @@ function _svAjusteAplicar() {
 }
 
 function _svAjusteFechar() {
+_svAjusteAberto = false;
   var modal = document.getElementById('svAjusteModal');
   if (modal) modal.style.display = 'none';
   _svPanorama = null;
