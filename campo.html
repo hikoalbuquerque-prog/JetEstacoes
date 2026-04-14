@@ -2667,7 +2667,7 @@ input:focus, select:focus {
     Selecionar e adicionar os ótimos aptos fisicamente
   </button>
 </div>
-
+</div>
 
 <!-- Legenda de pins de varredura (aparece quando varredura ativa) -->
 <div id="vrrLegenda" style="
@@ -11735,7 +11735,7 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
   var porCategoria = {};
   LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
 
-  elements.forEach(function(el) {
+  (elements || []).forEach(function(el) {
     var tags = el.tags || {};
     var cat = null;
 
@@ -11748,10 +11748,13 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     else if (tags.amenity && /hospital|clinic|pharmacy/.test(tags.amenity)) cat = 'saude';
     else if (tags.amenity === 'bank' || tags.office) cat = 'escritorio';
 
-    if (cat && el.lat && el.lon) {
+    var lat = Number(el.lat);
+    var lng = Number(el.lon);
+
+    if (cat && isFinite(lat) && isFinite(lng)) {
       porCategoria[cat].push({
-        lat: Number(el.lat),
-        lng: Number(el.lon),
+        lat: lat,
+        lng: lng,
         nome: tags.name || tags['name:pt'] || '',
         cat: cat
       });
