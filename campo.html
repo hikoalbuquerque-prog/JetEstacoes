@@ -11481,53 +11481,98 @@ function vrrAdicionarAprovados() {
 // ── LOCAIS PRIORITARIOS (Overpass API) ───────────────────────────
 
 var LOC_CATEGORIAS = [
-  { key: 'restaurante', nome: 'Restaurante / Cafe', cor: '#f97316',
-    query: 'node["amenity"~"restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten"]' },
-
-  { key: 'hotel', nome: 'Hotel / Hospedagem', cor: '#8b5cf6',
-    query: 'node["tourism"~"hotel|hostel|motel|guest_house|apartment"]' },
-
-  { key: 'shopping', nome: 'Shopping / Varejo', cor: '#f59e0b',
-    query: 'node["shop"~"mall|department_store|supermarket|convenience|wholesale|retail"]' },
-
-  { key: 'mercado', nome: 'Mercado / Atacado', cor: '#fbbf24',
-    query: 'node["shop"~"supermarket|convenience|greengrocer|bakery|butcher|wholesale"]' },
-
-  { key: 'transporte', nome: 'Transporte', cor: '#38bdf8',
-    query: 'node["public_transport"~"station|stop_position|platform"]'
-         + ';node["amenity"="bus_station"]'
-         + ';node["railway"~"station|halt|tram_stop|subway_entrance"]' },
-
-  { key: 'estacionamento', nome: 'Estacionamento', cor: '#06b6d4',
-    query: 'node["amenity"~"parking|parking_entrance|bicycle_parking|motorcycle_parking"]' },
-
-  { key: 'academia', nome: 'Academia / Esporte', cor: '#22c55e',
-    query: 'node["leisure"~"fitness_centre|sports_centre|stadium|pitch|swimming_pool"]'
-         + ';node["sport"]' },
-
-  { key: 'parque', nome: 'Parque / Lazer', cor: '#10b981',
-    query: 'node["leisure"~"park|playground|garden|recreation_ground"]'
-         + ';node["tourism"="zoo"]' },
-
-  { key: 'educacao', nome: 'Educacao', cor: '#6366f1',
-    query: 'node["amenity"~"school|university|college|kindergarten|library"]' },
-
-  { key: 'saude', nome: 'Saude', cor: '#ef4444',
-    query: 'node["amenity"~"hospital|clinic|pharmacy|doctors|dentist|laboratory"]' },
-
-  { key: 'banco', nome: 'Banco / ATM', cor: '#94a3b8',
-    query: 'node["amenity"~"bank|atm|bureau_de_change"]' },
-
-  { key: 'escritorio', nome: 'Escritorio / Coworking', cor: '#64748b',
-    query: 'node["office"]'
-         + ';node["amenity"~"coworking_space|conference_centre"]' },
-
-  { key: 'entretenimento', nome: 'Entretenimento', cor: '#a855f7',
-    query: 'node["amenity"~"cinema|theatre|arts_centre|events_venue|nightclub"]'
-         + ';node["leisure"~"bowling_alley|escape_game|amusement_arcade"]' },
-
-  { key: 'turismo', nome: 'Turismo / Cultura', cor: '#ec4899',
-    query: 'node["tourism"~"museum|gallery|attraction|viewpoint|artwork"]' }
+  {
+    key: 'restaurante',
+    nome: 'Restaurante / Cafe',
+    cor: '#f97316',
+    query: [
+      'node(around:{r},{lat},{lng})["amenity"~"restaurant|cafe|fast_food|food_court|bar|pub"]',
+      'way(around:{r},{lat},{lng})["amenity"~"restaurant|cafe|fast_food|food_court|bar|pub"]'
+    ]
+  },
+  {
+    key: 'hotel',
+    nome: 'Hotel / Hospedagem',
+    cor: '#8b5cf6',
+    query: [
+      'node(around:{r},{lat},{lng})["tourism"~"hotel|hostel|motel|guest_house"]',
+      'way(around:{r},{lat},{lng})["tourism"~"hotel|hostel|motel|guest_house"]'
+    ]
+  },
+  {
+    key: 'shopping',
+    nome: 'Shopping / Varejo',
+    cor: '#f59e0b',
+    query: [
+      'node(around:{r},{lat},{lng})["shop"~"mall|department_store|supermarket|convenience"]',
+      'way(around:{r},{lat},{lng})["shop"~"mall|department_store|supermarket|convenience"]'
+    ]
+  },
+  {
+    key: 'transporte',
+    nome: 'Transporte',
+    cor: '#38bdf8',
+    query: [
+      'node(around:{r},{lat},{lng})["public_transport"~"station|stop_position|platform"]',
+      'node(around:{r},{lat},{lng})["amenity"="bus_station"]',
+      'node(around:{r},{lat},{lng})["railway"~"station|halt|tram_stop|subway_entrance"]',
+      'way(around:{r},{lat},{lng})["railway"~"station|tram_stop|subway_entrance"]'
+    ]
+  },
+  {
+    key: 'academia',
+    nome: 'Academia / Esporte',
+    cor: '#22c55e',
+    query: [
+      'node(around:{r},{lat},{lng})["leisure"~"fitness_centre|sports_centre|stadium"]',
+      'way(around:{r},{lat},{lng})["leisure"~"fitness_centre|sports_centre|stadium"]'
+    ]
+  },
+  {
+    key: 'educacao',
+    nome: 'Educacao',
+    cor: '#6366f1',
+    query: [
+      'node(around:{r},{lat},{lng})["amenity"~"school|university|college|library"]',
+      'way(around:{r},{lat},{lng})["amenity"~"school|university|college|library"]'
+    ]
+  },
+  {
+    key: 'saude',
+    nome: 'Saude',
+    cor: '#ef4444',
+    query: [
+      'node(around:{r},{lat},{lng})["amenity"~"hospital|clinic|pharmacy|doctors|dentist"]',
+      'way(around:{r},{lat},{lng})["amenity"~"hospital|clinic|pharmacy|doctors|dentist"]'
+    ]
+  },
+  {
+    key: 'banco',
+    nome: 'Banco / ATM',
+    cor: '#94a3b8',
+    query: [
+      'node(around:{r},{lat},{lng})["amenity"~"bank|atm|bureau_de_change"]',
+      'way(around:{r},{lat},{lng})["amenity"~"bank|atm|bureau_de_change"]'
+    ]
+  },
+  {
+    key: 'parque',
+    nome: 'Parque / Lazer',
+    cor: '#10b981',
+    query: [
+      'node(around:{r},{lat},{lng})["leisure"~"park|playground|garden"]',
+      'way(around:{r},{lat},{lng})["leisure"~"park|playground|garden"]'
+    ]
+  },
+  {
+    key: 'escritorio',
+    nome: 'Escritorio / Coworking',
+    cor: '#64748b',
+    query: [
+      'node(around:{r},{lat},{lng})["office"]',
+      'way(around:{r},{lat},{lng})["office"]'
+    ]
+  }
 ];
 
 var _locaisResultados = {};
@@ -11761,8 +11806,26 @@ function _renderLocaisCardsAtivos_() {
   if (btnMostrar) btnMostrar.style.display = total > 0 ? 'block' : 'none';
 }
 
+function _locMontarQueryOverpass_(lat, lng, raioMetros) {
+  var parts = [];
+
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var arr = Array.isArray(cat.query) ? cat.query : [cat.query];
+    arr.forEach(function(q) {
+      parts.push(
+        q.replace(/\{r\}/g, String(raioMetros))
+         .replace(/\{lat\}/g, String(lat))
+         .replace(/\{lng\}/g, String(lng))
+         + ';'
+      );
+    });
+  });
+
+  return '[out:json][timeout:20];(' + parts.join('') + ');out center qt;';
+}
+
 function buscarLocaisPrioritarios(lat, lng, raioMetros) {
-  raioMetros = raioMetros || 900;
+  raioMetros = Number(raioMetros || 700);
   _locaisResultados = {};
   _locaisMarkers.forEach(function(m){ m.setMap(null); });
   _locaisMarkers = [];
@@ -11772,54 +11835,97 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   var contEl = document.getElementById('painelLocaisContador');
   if (!painel || !lista) return;
 
-  lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:8px">Buscando...</div>';
-  contEl.textContent = '';
+  lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:8px">Buscando POIs...</div>';
+  if (contEl) contEl.textContent = '';
   painel.style.display = 'block';
 
-  // Montar query Overpass
-  var queries = LOC_CATEGORIAS.map(function(cat) {
-    return cat.query + '(around:' + raioMetros + ',' + lat + ',' + lng + ');';
-  }).join('');
+  var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
 
-  var overpassQuery = '[out:json][timeout:8][maxsize:1000000];(' + queries + ');out body;';
-  // url construida por tentarServidor
-
-  // Tentar 2 servidores Overpass em sequencia
   var servidores = [
-    'https://overpass-api.de/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
   ];
 
-  function tentarServidor(idx) {
+  function fetchOverpass(url) {
+    var controller = new AbortController();
+    var to = setTimeout(function(){ controller.abort(); }, 12000);
+
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Accept': 'application/json,text/plain,*/*'
+      },
+      body: 'data=' + encodeURIComponent(overpassQuery),
+      signal: controller.signal
+    }).then(function(r) {
+      clearTimeout(to);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).catch(function(err) {
+      clearTimeout(to);
+      throw err;
+    });
+  }
+
+  function tentarServidor(idx, erros) {
+    erros = erros || [];
+
     if (idx >= servidores.length) {
-      if (lista) lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Servico indisponivel. Tente novamente.</div>';
+      var detalhe = erros.length ? (' (' + erros.join(' | ') + ')') : '';
+      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Servico indisponivel' + detalhe + '</div>';
       if (contEl) contEl.textContent = '';
       return;
     }
-    var fetchUrl = servidores[idx] + '?data=' + encodeURIComponent(overpassQuery);
-    fetch(fetchUrl)
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
+
+    fetchOverpass(servidores[idx])
+      .then(function(data) {
+        var elements = (data && data.elements) || [];
+        _processarResultadosLocais_(elements, lat, lng);
       })
-      .then(function(text) {
-        if (!text || text.trim().length === 0) throw new Error('Resposta vazia');
-        var data;
-        try { data = JSON.parse(text); } catch(e) { throw new Error('JSON invalido'); }
-        _processarResultadosLocais_(data.elements || [], lat, lng);
-      })
-      .catch(function(e) {
-        console.warn('[Locais] Servidor ' + idx + ' falhou:', e.message, '-- tentando proximo');
-        tentarServidor(idx + 1);
+      .catch(function(err) {
+        console.warn('[Locais] falha em', servidores[idx], err);
+        erros.push((servidores[idx].split('/')[2] || 'srv') + ': ' + (err.message || 'erro'));
+        tentarServidor(idx + 1, erros);
       });
   }
 
-  tentarServidor(0);
+  tentarServidor(0, []);
 }
 
 function _processarResultadosLocais_(elements, centerLat, centerLng) {
-  var porCategoria = {};
-  LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
+  function detectarCategoria(tags) {
+    tags = tags || {};
+
+    if (tags.amenity && /restaurant|cafe|fast_food|food_court|bar|pub/.test(tags.amenity)) return 'restaurante';
+    if (tags.tourism && /hotel|hostel|motel|guest_house/.test(tags.tourism)) return 'hotel';
+    if (tags.shop && /mall|department_store|supermarket|convenience/.test(tags.shop)) return 'shopping';
+    if (
+      (tags.public_transport && /station|stop_position|platform/.test(tags.public_transport)) ||
+      tags.amenity === 'bus_station' ||
+      (tags.railway && /station|halt|tram_stop|subway_entrance/.test(tags.railway))
+    ) return 'transporte';
+    if (tags.leisure && /fitness_centre|sports_centre|stadium/.test(tags.leisure)) return 'academia';
+    if (tags.amenity && /school|university|college|library/.test(tags.amenity)) return 'educacao';
+    if (tags.amenity && /hospital|clinic|pharmacy|doctors|dentist/.test(tags.amenity)) return 'saude';
+    if (tags.amenity && /bank|atm|bureau_de_change/.test(tags.amenity)) return 'banco';
+    if (tags.leisure && /park|playground|garden/.test(tags.leisure)) return 'parque';
+    if (tags.office) return 'escritorio';
+
+    return null;
+  }
+
+  function getLat(el) {
+    if (el.lat != null) return Number(el.lat);
+    if (el.center && el.center.lat != null) return Number(el.center.lat);
+    return NaN;
+  }
+
+  function getLng(el) {
+    if (el.lon != null) return Number(el.lon);
+    if (el.center && el.center.lon != null) return Number(el.center.lon);
+    return NaN;
+  }
 
   function distM(aLat, aLng, bLat, bLng) {
     try {
@@ -11832,55 +11938,15 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     }
   }
 
+  var porCategoria = {};
+  LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
+
   (elements || []).forEach(function(el) {
     var tags = el.tags || {};
-    var cat = null;
+    var cat = detectarCategoria(tags);
+    var lat = getLat(el);
+    var lng = getLng(el);
 
-    if (tags.amenity && /restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten/.test(tags.amenity)) {
-      cat = 'restaurante';
-    } else if (tags.tourism && /hotel|hostel|motel|guest_house|apartment/.test(tags.tourism)) {
-      cat = 'hotel';
-    } else if (tags.shop && /mall|department_store|retail/.test(tags.shop)) {
-      cat = 'shopping';
-    } else if (tags.shop && /supermarket|convenience|greengrocer|bakery|butcher|wholesale/.test(tags.shop)) {
-      cat = 'mercado';
-    } else if (
-      (tags.public_transport && /station|stop_position|platform/.test(tags.public_transport)) ||
-      tags.amenity === 'bus_station' ||
-      (tags.railway && /station|halt|tram_stop|subway_entrance/.test(tags.railway))
-    ) {
-      cat = 'transporte';
-    } else if (tags.amenity && /parking|parking_entrance|bicycle_parking|motorcycle_parking/.test(tags.amenity)) {
-      cat = 'estacionamento';
-    } else if (
-      (tags.leisure && /fitness_centre|sports_centre|stadium|pitch|swimming_pool/.test(tags.leisure)) ||
-      !!tags.sport
-    ) {
-      cat = 'academia';
-    } else if (
-      (tags.leisure && /park|playground|garden|recreation_ground/.test(tags.leisure)) ||
-      tags.tourism === 'zoo'
-    ) {
-      cat = 'parque';
-    } else if (tags.amenity && /school|university|college|kindergarten|library/.test(tags.amenity)) {
-      cat = 'educacao';
-    } else if (tags.amenity && /hospital|clinic|pharmacy|doctors|dentist|laboratory/.test(tags.amenity)) {
-      cat = 'saude';
-    } else if (tags.amenity && /bank|atm|bureau_de_change/.test(tags.amenity)) {
-      cat = 'banco';
-    } else if (!!tags.office || (tags.amenity && /coworking_space|conference_centre/.test(tags.amenity))) {
-      cat = 'escritorio';
-    } else if (
-      (tags.amenity && /cinema|theatre|arts_centre|events_venue|nightclub/.test(tags.amenity)) ||
-      (tags.leisure && /bowling_alley|escape_game|amusement_arcade/.test(tags.leisure))
-    ) {
-      cat = 'entretenimento';
-    } else if (tags.tourism && /museum|gallery|attraction|viewpoint|artwork/.test(tags.tourism)) {
-      cat = 'turismo';
-    }
-
-    var lat = Number(el.lat);
-    var lng = Number(el.lon);
     if (!cat || !isFinite(lat) || !isFinite(lng)) return;
 
     porCategoria[cat].push({
@@ -11892,8 +11958,10 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     });
   });
 
+  var bruto = 0;
   LOC_CATEGORIAS.forEach(function(cat) {
     var lista = porCategoria[cat.key] || [];
+    bruto += lista.length;
 
     lista.sort(function(a, b) {
       var an = a.nome ? 1 : 0;
@@ -11902,7 +11970,7 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
       return (a.dist || 999999) - (b.dist || 999999);
     });
 
-    porCategoria[cat.key] = lista.slice(0, 18);
+    porCategoria[cat.key] = lista.slice(0, 24);
   });
 
   _locaisResultados = _locPoiFiltrarDuplicados_(porCategoria, 35);
@@ -11913,6 +11981,17 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
   });
 
   _renderLocaisCardsAtivos_();
+
+  var listaEl = document.getElementById('painelLocaisLista');
+  var contEl  = document.getElementById('painelLocaisContador');
+
+  if (contEl) contEl.textContent = '(' + total + ')';
+
+  if (bruto === 0 && listaEl) {
+    listaEl.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Nenhum POI encontrado nessa area</div>';
+  } else if (bruto > 0 && total === 0 && listaEl) {
+    listaEl.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">POIs encontrados, mas todos filtrados por cobertura/duplicidade</div>';
+  }
 
   if (total > 0) {
     mostrarTodasLocais();
