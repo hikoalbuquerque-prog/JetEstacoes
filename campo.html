@@ -1206,35 +1206,6 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 }
 
 /* TOAST */
-<div id="svAjusteModal" style="display:none;position:fixed;inset:0;z-index:99050;background:rgba(0,0,0,.72);backdrop-filter:blur(4px)">
-  <div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center">
-    <div style="width:min(1100px,96vw);height:min(760px,92vh);background:#0c1423;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column">
-      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px">
-        <div style="min-width:0;flex:1">
-          <div style="font-size:11px;letter-spacing:.08em;color:#60a5fa;font-weight:800">STREET VIEW MANUAL</div>
-          <div id="svAjusteTitulo" style="font-size:14px;font-weight:700;color:#fff;margin-top:2px">Ajustar ponto</div>
-          <div id="svAjusteCoords" style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">--</div>
-        </div>
-        <button onclick="_svAjusteReset()" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:12px">Voltar ao original</button>
-        <button onclick="_svAjusteAplicar()" style="padding:8px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:700">Usar posição atual</button>
-        <button onclick="_svAjusteFechar()" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);cursor:pointer;font-size:16px">×</button>
-      </div>
-
-      <div id="svAjustePanorama" style="flex:1;min-height:280px;background:#0b1220"></div>
-
-      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="min-width:0;flex:1">
-          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POSIÇÃO ATUAL</div>
-          <div id="svAjusteAtual" style="font-size:12px;color:#fff;margin-top:2px">--</div>
-        </div>
-        <div style="min-width:0;flex:1;text-align:right">
-          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POV ATUAL</div>
-          <div id="svAjustePov" style="font-size:12px;color:#fff;margin-top:2px">--</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 #campoToast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(8px);z-index:99000;background:rgba(17,24,39,.96);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:9px 16px;font-size:13px;color:white;white-space:nowrap;opacity:0;transition:.2s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 #campoToast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #campoToast.success{border-color:rgba(34,197,94,.3);color:#4ade80}
@@ -2697,15 +2668,6 @@ input:focus, select:focus {
   </button>
 </div>
 
-  <div id="vrrFooter" style="display:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0">
-    <button onclick="vrrAdicionarAprovados()" style="
-      width:100%;padding:10px;border-radius:8px;border:none;cursor:pointer;
-      font-size:12px;font-weight:700;
-      background:linear-gradient(135deg,#059669,#10b981);color:white">
-      Selecionar e adicionar os ótimos aptos fisicamente
-    </button>
-  </div>
-</div>
 
 <!-- Legenda de pins de varredura (aparece quando varredura ativa) -->
 <div id="vrrLegenda" style="
@@ -2843,6 +2805,38 @@ input:focus, select:focus {
     ">x Cancelar</button>
   </div>
 </div>
+
+
+<div id="svAjusteModal" style="display:none;position:fixed;inset:0;z-index:99050;background:rgba(0,0,0,.72);backdrop-filter:blur(4px)">
+  <div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center">
+    <div style="width:min(1100px,96vw);height:min(760px,92vh);background:#0c1423;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column">
+      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:11px;letter-spacing:.08em;color:#60a5fa;font-weight:800">STREET VIEW MANUAL</div>
+          <div id="svAjusteTitulo" style="font-size:14px;font-weight:700;color:#fff;margin-top:2px">Ajustar ponto</div>
+          <div id="svAjusteCoords" style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">--</div>
+        </div>
+        <button onclick="_svAjusteReset()" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:12px">Voltar ao original</button>
+        <button onclick="_svAjusteAplicar()" style="padding:8px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:700">Usar posição atual</button>
+        <button onclick="_svAjusteFechar()" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);cursor:pointer;font-size:16px">×</button>
+      </div>
+
+      <div id="svAjustePanorama" style="flex:1;min-height:280px;background:#0b1220"></div>
+
+      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POSIÇÃO ATUAL</div>
+          <div id="svAjusteAtual" style="font-size:12px;color:#fff;margin-top:2px">--</div>
+        </div>
+        <div style="min-width:0;flex:1;text-align:right">
+          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POV ATUAL</div>
+          <div id="svAjustePov" style="font-size:12px;color:#fff;margin-top:2px">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <div id="campoToast"></div>
 
