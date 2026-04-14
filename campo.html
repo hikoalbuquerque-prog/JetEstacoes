@@ -11818,84 +11818,26 @@ function fecharPainelLocais() {
 // ── MODAL LOCAL PRIORITARIO + ANALISE IA ─────────────────────────
 var _mlpItem = null; // item atual { lat, lng, nome, cat, cor }
 
-function abrirModalLocal(item) {
-  _mlpItem = item;
-  _mlpGeocodedAddr = null; // reset geocode anterior
-
-  var modal = document.getElementById('modalLocalPri');
-  if (!modal) return;
-
-  // Preencher header
-  var cat = LOC_CATEGORIAS.find(function(c){ return c.key === item.cat; });
-  document.getElementById('mlpCategoria').textContent = cat ? cat.nome.toUpperCase() : item.cat.toUpperCase();
-  document.getElementById('mlpCategoria').style.color = cat ? cat.cor : '#60a5fa';
-  document.getElementById('mlpNome').textContent = item.nome || 'Local sem nome';
-  document.getElementById('mlpEndereco').textContent = item.lat.toFixed(5) + ', ' + item.lng.toFixed(5);
-
-  // Street View preview via GAS (sem restricao de referrer)
-  var svImg = document.getElementById('mlpStreetImg');
-  var svPh  = document.getElementById('mlpStreetPlaceholder');
-  if (svImg && svPh) {
-    svImg.style.display = 'none';
-    svPh.style.display = 'flex';
-    svPh.textContent = 'Carregando Street View...';
-  }
-
-  // Reset estado  --  ja inicia a analise IA automaticamente
-  document.getElementById('mlpResultadoIA').style.display = 'none';
-  document.getElementById('mlpBotoesInicial').style.display = 'none';
-  document.getElementById('mlpBotoesPos').style.display = 'none';
-  document.getElementById('mlpLoadingIA').style.display = 'block';
-
-  modal.style.display = 'block';
-
-  // Geocode reverso em paralelo com a analise IA
-  _mlpGeocodeReverso_(item.lat, item.lng);
-
-  // Iniciar analise IA automaticamente
-  mlpAnalisarIA();
+function _mlpStreetPreviewUrl_(lat, lng) {
+  var key = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
+  if (!key) return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=900x450'
+    + '&location=' + Number(lat) + ',' + Number(lng)
+    + '&fov=90'
+    + '&pitch=0'
+    + '&source=outdoor'
+    + '&key=' + key;
 }
 
-// Geocode reverso via Google para pegar endereco/bairro/cidade
-var _mlpGeocodedAddr = null;
-function _mlpGeocodeReverso_(lat, lng) {
-  var key = window.GMAPS_KEY || '';
-  if (!key) return;
-  var url = 'https://maps.googleapis.com/maps/api/geocode/json'
-    + '?latlng=' + lat + ',' + lng
-    + '&language=pt-BR&key=' + key;
-
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      if (!data.results || !data.results.length) return;
-      var res = data.results[0];
-      var addr = { endereco: '', bairro: '', cidade: '', uf: '' };
-
-      // Montar endereco principal
-      addr.endereco = res.formatted_address || '';
-
-      // Extrair componentes
-      (res.address_components || []).forEach(function(comp) {
-        var types = comp.types || [];
-        if (types.indexOf('sublocality') !== -1 || types.indexOf('neighborhood') !== -1) {
-          addr.bairro = comp.long_name;
-        }
-        if (types.indexOf('locality') !== -1) {
-          addr.cidade = comp.long_name;
-        }
-        if (types.indexOf('administrative_area_level_1') !== -1) {
-          addr.uf = comp.short_name;
-        }
-      });
-
-      _mlpGeocodedAddr = addr;
-
-      // Atualizar label de endereco no modal
-      var elEnd = document.getElementById('mlpEndereco');
-      if (elEnd && addr.endereco) elEnd.textContent = addr.endereco;
-    })
-    .catch(function(){});
+function _mlpStreetPreviewUrl_(lat, lng) {
+  var key = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
+  if (!key) return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=900x450'
+    + '&location=' + Number(lat) + ',' + Number(lng)
+    + '&fov=90'
+    + '&pitch=0'
+    + '&source=outdoor'
+    + '&key=' + key;
 }
 
 function fecharModalLocal() {
