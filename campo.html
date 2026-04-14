@@ -9885,9 +9885,27 @@ function _vrrScorePOIs(lat, lng) {
 // ── Analise de calcada via GAS + Claude ──────────────
 function _vrrScoreCalcada(lat, lng) {
   return new Promise(function(resolve) {
+    var latNum = Number(String(lat).replace(',', '.'));
+    var lngNum = Number(String(lng).replace(',', '.'));
+
+    if (!isFinite(latNum) || !isFinite(lngNum)) {
+      resolve({
+        score: 0,
+        aprovado: null,
+        obs: 'Coordenadas invalidas no candidato.',
+        largura: 'indefinido',
+        confianca: 'baixa',
+        motivoCodigo: 'IMAGEM_INSUFICIENTE',
+        imagensAnalisadas: 0,
+        imagensPositivas: 0,
+        imagensBloqueantes: 0
+      });
+      return;
+    }
+
     _gasRun('analisarCalcadaIA', {
-        lat: lat,
-        lng: lng,
+        lat: latNum,
+        lng: lngNum,
         amostras: 8,
         contexto: 'varredura'
       },
@@ -10745,6 +10763,9 @@ function _vrrAdicionarItemLista(r) {
 
   var obsCalcada = r.calcadaObs || '';
   if (obsCalcada === 'Coords invalidas' || obsCalcada === 'Erro GAS') obsCalcada = '';
+  if (obsCalcada === 'Lat/Lng invalidos.' || obsCalcada === 'Coordenadas invalidas para analise deste ponto.') {
+  obsCalcada = 'Ponto com coordenada invalida na analise.';
+}
   if (obsCalcada === 'Sem Street View') obsCalcada = 'Sem imagem disponivel neste local';
   if (!obsCalcada && !r.aptoFisico) obsCalcada = 'Reprovado fisicamente para implantacao.';
 
@@ -11575,11 +11596,19 @@ function mlpAnalisarIA() {
   document.getElementById('mlpResultadoIA').style.display = 'none';
   document.getElementById('mlpLoadingIA').style.display = 'block';
 
-  var lat = _mlpItem.lat;
-  var lng = _mlpItem.lng;
+  var lat = Number(String(_mlpItem.lat).replace(',', '.'));
+  var lng = Number(String(_mlpItem.lng).replace(',', '.'));
 
-  // GAS faz tudo: Street View + Gemini server-side
-  // Browser so envia lat/lng
+  if (!isFinite(lat) || !isFinite(lng)) {
+    _exibirResultadoIA_({
+      aprovado: null,
+      larguraEstimada: 'indefinido',
+      observacoes: 'Coordenadas invalidas neste local.',
+      confianca: 'baixa'
+    });
+    return;
+  }
+
   _gasRun('analisarCalcadaIA', {
     lat: lat,
     lng: lng,
@@ -11590,7 +11619,7 @@ function mlpAnalisarIA() {
       if (!res || !res.ok) {
         _exibirResultadoIA_({
           aprovado: null,
-          larguraEstimada: 'N/A',
+          larguraEstimada: 'indefinido',
           observacoes: (res && res.error) ? res.error : 'Erro na analise',
           confianca: 'baixa'
         });
@@ -11599,7 +11628,12 @@ function mlpAnalisarIA() {
       _exibirResultadoIA_(res.resultado);
     },
     function(err) {
-      _exibirResultadoIA_({ aprovado: null, larguraEstimada: 'N/A', observacoes: 'Erro GAS: ' + String(err), confianca: 'baixa' });
+      _exibirResultadoIA_({
+        aprovado: null,
+        larguraEstimada: 'indefinido',
+        observacoes: 'Erro GAS: ' + String(err),
+        confianca: 'baixa'
+      });
     }
   );
 }
