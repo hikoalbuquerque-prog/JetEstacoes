@@ -11757,8 +11757,9 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
 
 function _criarMarkerLocal_(item, cor) {
   if (!window._gmap || !window.google) return null;
+
   var marker = new google.maps.Marker({
-    position: { lat: item.lat, lng: item.lng },
+    position: { lat: Number(item.lat), lng: Number(item.lng) },
     map: window._gmap,
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
@@ -11771,11 +11772,20 @@ function _criarMarkerLocal_(item, cor) {
     title: item.nome || item.cat,
     zIndex: 100
   });
+
   marker.addListener('click', function() {
-    abrirModalLocal(item);
+    abrirModalLocal({
+      lat: Number(item.lat),
+      lng: Number(item.lng),
+      nome: item.nome || '',
+      cat: item.cat || '',
+      cor: cor
+    });
   });
+
   return marker;
 }
+
 
 function filtrarLocaisCategoria(catKey) {
   _locaisMarkers.forEach(function(m){ m.setMap(null); });
@@ -11849,31 +11859,77 @@ function fecharModalLocal() {
 function mlpAdicionarDireto() {
   if (!_mlpItem) return;
 
-  var lat = Number(_mlpItem.lat);
-  var lng = Number(_mlpItem.lng);
+  var item = _mlpItem;
+  var addr = _mlpGeocodedAddr;
+
+  var lat = Number(item.lat);
+  var lng = Number(item.lng);
 
   if (!isFinite(lat) || !isFinite(lng)) {
-    cToast('Coordenadas inválidas.', 'error');
-    return;
-  }
-
-  if (_jaExisteMuitoProximo_(lat, lng, 30)) {
-    cToast('Já existe estação muito próxima desse ponto.', 'warn');
+    if (typeof cToast === 'function') cToast('Coordenadas inválidas no POI', 'error');
     return;
   }
 
   fecharModalLocal();
 
+  var latLng = new google.maps.LatLng(lat, lng);
+  cOpenDrawer();
+
   setTimeout(function() {
-    if (typeof cOpenDrawer === 'function') cOpenDrawer();
-    if (typeof cPlacePin === 'function') cPlacePin(lat, lng);
+    cPlacePin(latLng);
 
     setTimeout(function() {
       var elLat = document.getElementById('addLat');
       var elLng = document.getElementById('addLng');
       if (elLat) elLat.value = lat.toFixed(7);
       if (elLng) elLng.value = lng.toFixed(7);
-    }, 120);
+
+      if (addr) {
+        var elEnd = document.getElementById('addEndereco');
+        if (elEnd && addr.endereco) elEnd.value = addr.endereco;
+
+        var elBairro = document.getElementById('addBairro');
+        if (elBairro && addr.bairro) elBairro.value = addr.bairro;
+
+        var elCid = document.getElementById('addCidade');
+        if (elCid && addr.cidade) {
+          elCid.value = addr.cidade;
+          elCid.dispatchEvent(new Event('change'));
+        }
+      }
+
+      var elObs = document.getElementById('addObs');
+      if (elObs && item.nome) {
+        elObs.value = (elObs.value ? elObs.value + '\n' : '') + 'Próximo a: ' + item.nome;
+      }
+
+      var mapsKey = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
+      if (mapsKey) {
+        var pp = document.getElementById('cPhotoPreview');
+        var pa = document.getElementById('cPhotoArea');
+        if (pp && pa) {
+          var svUrl = 'https://maps.googleapis.com/maps/api/streetview?size=600x300'
+            + '&location=' + lat + ',' + lng
+            + '&fov=90&pitch=0&source=outdoor'
+            + '&key=' + mapsKey;
+
+          pp.src = svUrl;
+          pp.onload = function() {
+            pp.classList.add('visible');
+            pa.classList.add('has-photo');
+            pp.title = 'Imagem Street View — confirme o ponto antes de salvar';
+          };
+          pp.onerror = function() {
+            pp.classList.remove('visible');
+            pa.classList.remove('has-photo');
+          };
+        }
+      }
+
+      if (typeof cToast === 'function') {
+        cToast('POI pronto para adicionar', 'success');
+      }
+    }, 300);
   }, 80);
 }
 
