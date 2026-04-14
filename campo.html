@@ -6996,17 +6996,38 @@ function cPlacePin(latLng) {
 function cReverseGeocodePin(lat, lng) {
   _gasRun('reverseGeocodePWA', { lat: lat, lng: lng },
     function(res) {
-      if (!res || !res.ok || !res.geo) return;
+      var el = document.getElementById('cPanelEndereco');
+      var elB = document.getElementById('cPanelBairro');
+
+      if (!res || !res.ok || !res.geo) {
+        if (el) {
+          el.textContent = 'Endereço não encontrado';
+          el.style.color = 'rgba(255,255,255,.45)';
+        }
+        if (elB) elB.textContent = '--';
+        return;
+      }
+
       CS.endereco = res.geo.endereco || '';
       CS.bairro   = res.geo.bairro   || '';
       CS.cidade   = res.geo.cidade   || '';
       CS.pais     = res.geo.pais     || 'BR';
-      var el = document.getElementById('cPanelEndereco');
-      if (el) { el.textContent = CS.endereco || '--'; el.style.color = 'rgba(255,255,255,.85)'; }
-      var elB = document.getElementById('cPanelBairro');
+
+      if (el) {
+        el.textContent = CS.endereco || '--';
+        el.style.color = 'rgba(255,255,255,.85)';
+      }
       if (elB) elB.textContent = [CS.bairro, CS.cidade].filter(Boolean).join(' / ') || '--';
     },
-    function() {}
+    function() {
+      var el = document.getElementById('cPanelEndereco');
+      var elB = document.getElementById('cPanelBairro');
+      if (el) {
+        el.textContent = 'Falha ao buscar endereço';
+        el.style.color = 'rgba(255,255,255,.45)';
+      }
+      if (elB) elB.textContent = '--';
+    }
   );
 }
 
@@ -7014,17 +7035,8 @@ function cReverseGeocodePin(lat, lng) {
 function cBuscarEnderecoPainel() {
   var q = (document.getElementById('cPanelBusca').value || '').trim();
   if (!q) return;
-  _gasRun('addEstacaoFromMapa', payload,
-      function(res) {
-      if (!res || !res.ok) { cToast('Endereco nao encontrado', 'error'); return; }
-      CS.lat = res.lat; CS.lng = res.lng;
-      CS.endereco = res.endereco || q; CS.bairro = res.bairro || '';
-      CS.cidade = res.cidade || ''; CS.pais = res.pais || 'BR';
-      var ll = new google.maps.LatLng(res.lat, res.lng);
-      cPlacePin(ll);
-      var gm = getGmap(); if (gm) { gm.panTo(ll); gm.setZoom(17); }
-    },
-      function(e) { cToast('Erro: ' + String(e), 'error'); });
+
+  cToast('Busca por endereço ainda não configurada no backend.', 'warn');
 }
 
 /* ---- CHECK PROXIMIDADE ---- */
@@ -11549,8 +11561,75 @@ function _locPoiFiltrarDuplicados_(porCategoria, distMinM) {
 }
 
 function _locPoiAbrirMapa(lat, lng) {
-  if (typeof cPlacePin === 'function') cPlacePin(Number(lat), Number(lng));
-  if (typeof cOpenDrawer === 'function') cOpenDrawer();
+  lat = Number(lat);
+  lng = Number(lng);
+
+  if (!isFinite(lat) || !isFinite(lng)) {
+    cToast('Coordenadas inválidas no POI.', 'error');
+    return;
+  }
+
+  var gmap = window._gmap;
+  if (gmap) {
+    var ll = new google.maps.LatLng(lat, lng);
+    gmap.panTo(ll);
+    gmap.setZoom(Math.max(gmap.getZoom() || 0, 18));
+  }
+}
+
+function _locPoiPreencherDrawer_(item, geo) {
+  geo = geo || {};
+
+  CS.endereco = geo.endereco || CS.endereco || '';
+  CS.bairro   = geo.bairro   || CS.bairro   || '';
+  CS.cidade   = geo.cidade   || CS.cidade   || '';
+  CS.pais     = geo.pais     || CS.pais     || 'BR';
+
+  var elEnd = document.getElementById('cPanelEndereco');
+  if (elEnd) {
+    elEnd.textContent = CS.endereco || 'Endereço não encontrado';
+    elEnd.style.color = CS.endereco ? 'rgba(255,255,255,.85)' : 'rgba(255,255,255,.45)';
+  }
+
+  var elB = document.getElementById('cPanelBairro');
+  if (elB) elB.textContent = [CS.bairro, CS.cidade].filter(Boolean).join(' / ') || '--';
+
+  var elCoords = document.getElementById('cPanelCoords');
+  if (elCoords && isFinite(CS.lat) && isFinite(CS.lng)) {
+    elCoords.textContent = Number(CS.lat).toFixed(5) + ', ' + Number(CS.lng).toFixed(5);
+  }
+
+  var elObs = document.getElementById('cObs');
+  if (elObs && item && item.nome) {
+    var base = (elObs.value || '').trim();
+    var tag = 'Próximo a: ' + item.nome;
+    if (base.indexOf(tag) === -1) {
+      elObs.value = base ? (base + '\n' + tag) : tag;
+    }
+  }
+
+  var mapsKey = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
+  if (mapsKey && isFinite(CS.lat) && isFinite(CS.lng)) {
+    var pp = document.getElementById('cPhotoPreview');
+    var pa = document.getElementById('cPhotoArea');
+    if (pp && pa) {
+      var svUrl = 'https://maps.googleapis.com/maps/api/streetview?size=600x300'
+        + '&location=' + CS.lat + ',' + CS.lng
+        + '&fov=90&pitch=0&source=outdoor'
+        + '&key=' + mapsKey;
+
+      pp.src = svUrl;
+      pp.onload = function() {
+        pp.classList.add('visible');
+        pa.classList.add('has-photo');
+        pp.title = 'Imagem Street View — confirme o ponto antes de salvar';
+      };
+      pp.onerror = function() {
+        pp.classList.remove('visible');
+        pa.classList.remove('has-photo');
+      };
+    }
+  }
 }
 
 function _locPoiAdicionarDireto(item) {
@@ -11574,48 +11653,24 @@ function _locPoiAdicionarDireto(item) {
     return;
   }
 
-  cToast('Salvando POI...', 'info');
+  cOpenDrawer();
 
-  _gasRun('reverseGeocodePWA', { lat: lat, lng: lng }, function(geoRes) {
-    var geo = (geoRes && geoRes.ok && geoRes.geo) || {};
+  setTimeout(function() {
+    var ll = new google.maps.LatLng(lat, lng);
+    cPlacePin(ll);
 
-    _gasRun('addEstacaoFromMapa', {
-      email: CS.user.email || '',
-      lat: lat,
-      lng: lng,
-      tipo: 'PUBLICA',
-      modalidade: 'PATINETE',
-      nomeConcorrente: '',
-      observacoes: 'Adicionado via POI ativo' + (item.nome ? ' • ' + item.nome : ''),
-      status: 'SOLICITADO',
-      dimensoes: '',
-      larguraFaixa: '',
-      geo: {
-        cidade:   geo.cidade   || '',
-        bairro:   geo.bairro   || '',
-        endereco: geo.endereco || '',
-        pais:     geo.pais     || 'BR'
+    _gasRun('reverseGeocodePWA', { lat: lat, lng: lng },
+      function(res) {
+        var geo = (res && res.ok && res.geo) ? res.geo : {};
+        _locPoiPreencherDrawer_(item, geo);
+        cToast('POI pronto para adicionar', 'success');
       },
-      operador: CS.user.email,
-      origem: 'PWA_POI_ATIVO',
-      foto: null
-    }, function(res) {
-      if (res && res.ok) {
-        _locaisJaAdicionados.push({ lat: lat, lng: lng });
-        cToast('POI adicionado com sucesso', 'success');
-
-        buscarLocaisPrioritarios(window._gmap.getCenter().lat(), window._gmap.getCenter().lng(), 300);
-
-        if (window._refreshMapa) window._refreshMapa();
-      } else {
-        cToast((res && res.error) || 'Erro ao adicionar POI', 'error');
+      function() {
+        _locPoiPreencherDrawer_(item, {});
+        cToast('POI aberto. Endereço não retornou.', 'warn');
       }
-    }, function(err) {
-      cToast('Erro GAS: ' + String(err), 'error');
-    });
-  }, function() {
-    cToast('Falha ao geocodificar POI', 'error');
-  });
+    );
+  }, 80);
 }
 
 function _locPoiCardHtml_(item, cat) {
@@ -11735,6 +11790,17 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
   var porCategoria = {};
   LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
 
+  function distM(aLat, aLng, bLat, bLng) {
+    try {
+      return google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(Number(aLat), Number(aLng)),
+        new google.maps.LatLng(Number(bLat), Number(bLng))
+      );
+    } catch (e) {
+      return 999999;
+    }
+  }
+
   (elements || []).forEach(function(el) {
     var tags = el.tags || {};
     var cat = null;
@@ -11750,14 +11816,33 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
 
     var lat = Number(el.lat);
     var lng = Number(el.lon);
+    if (!cat || !isFinite(lat) || !isFinite(lng)) return;
 
-    if (cat && isFinite(lat) && isFinite(lng)) {
-      porCategoria[cat].push({
-        lat: lat,
-        lng: lng,
-        nome: tags.name || tags['name:pt'] || '',
-        cat: cat
-      });
+    var nome = (tags.name || tags['name:pt'] || '').trim();
+
+    porCategoria[cat].push({
+      lat: lat,
+      lng: lng,
+      nome: nome,
+      cat: cat,
+      dist: distM(centerLat, centerLng, lat, lng)
+    });
+  });
+
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var lista = porCategoria[cat.key] || [];
+
+    lista.sort(function(a, b) {
+      var an = a.nome ? 1 : 0;
+      var bn = b.nome ? 1 : 0;
+      if (an !== bn) return bn - an;
+      return (a.dist || 999999) - (b.dist || 999999);
+    });
+
+    if (lista.length > 12) {
+      var comNome = lista.filter(function(x){ return !!x.nome; });
+      var semNome = lista.filter(function(x){ return !x.nome; }).slice(0, 3);
+      porCategoria[cat.key] = comNome.concat(semNome);
     }
   });
 
