@@ -11449,6 +11449,189 @@ var _locaisResultados = {};
 var _locaisMarkers = [];
 var _locaisVisiveis = false;
 var _locaisCategoriaAtiva = null;
+var _locaisJaAdicionados = window._locaisJaAdicionados || [];
+window._locaisJaAdicionados = _locaisJaAdicionados;
+
+function _locPoiMapsKey_() {
+  return window._MAPS_KEY || window.MAPS_KEY || '';
+}
+
+function _locPoiSvThumb_(lat, lng) {
+  var key = _locPoiMapsKey_();
+  if (!key) return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=320x160'
+    + '&location=' + Number(lat) + ',' + Number(lng)
+    + '&fov=90&pitch=0&source=outdoor'
+    + '&key=' + key;
+}
+
+function _locPoiDistM_(lat1, lng1, lat2, lng2) {
+  try {
+    return google.maps.geometry.spherical.computeDistanceBetween(
+      new google.maps.LatLng(Number(lat1), Number(lng1)),
+      new google.maps.LatLng(Number(lat2), Number(lng2))
+    );
+  } catch (e) {
+    return 999999;
+  }
+}
+
+function _locPoiJaCoberto_(lat, lng, distMinM) {
+  distMinM = Number(distMinM || 35);
+
+  var base = Array.isArray(window.estacoes) ? window.estacoes : [];
+  for (var i = 0; i < base.length; i++) {
+    var e = base[i];
+    if (!e || e.lat == null || e.lng == null) continue;
+    if (_locPoiDistM_(lat, lng, e.lat, e.lng) < distMinM) return true;
+  }
+
+  for (var j = 0; j < _locaisJaAdicionados.length; j++) {
+    var p = _locaisJaAdicionados[j];
+    if (!p) continue;
+    if (_locPoiDistM_(lat, lng, p.lat, p.lng) < distMinM) return true;
+  }
+
+  return false;
+}
+
+function _locPoiFiltrarDuplicados_(porCategoria, distMinM) {
+  var out = {};
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var lista = porCategoria[cat.key] || [];
+    out[cat.key] = lista.filter(function(item) {
+      return !_locPoiJaCoberto_(item.lat, item.lng, distMinM || 35);
+    });
+  });
+  return out;
+}
+
+function _locPoiAbrirMapa(lat, lng) {
+  if (typeof cPlacePin === 'function') cPlacePin(Number(lat), Number(lng));
+  if (typeof cOpenDrawer === 'function') cOpenDrawer();
+}
+
+function _locPoiAdicionarDireto(item) {
+  if (!item) return;
+
+  var lat = Number(item.lat);
+  var lng = Number(item.lng);
+
+  if (!isFinite(lat) || !isFinite(lng)) {
+    cToast('Coordenadas inválidas no POI.', 'error');
+    return;
+  }
+
+  if (_locPoiJaCoberto_(lat, lng, 35)) {
+    cToast('Já existe estação muito próxima desse POI.', 'warn');
+    return;
+  }
+
+  if (!window.CS || !CS.user || !CS.user.email) {
+    cToast('Faça login antes de adicionar.', 'warn');
+    return;
+  }
+
+  cToast('Salvando POI...', 'info');
+
+  _gasRun('reverseGeocodePWA', { lat: lat, lng: lng }, function(geoRes) {
+    var geo = (geoRes && geoRes.ok && geoRes.geo) || {};
+
+    _gasRun('addEstacaoFromMapa', {
+      email: CS.user.email || '',
+      lat: lat,
+      lng: lng,
+      tipo: 'PUBLICA',
+      modalidade: 'PATINETE',
+      nomeConcorrente: '',
+      observacoes: 'Adicionado via POI ativo' + (item.nome ? ' • ' + item.nome : ''),
+      status: 'SOLICITADO',
+      dimensoes: '',
+      larguraFaixa: '',
+      geo: {
+        cidade:   geo.cidade   || '',
+        bairro:   geo.bairro   || '',
+        endereco: geo.endereco || '',
+        pais:     geo.pais     || 'BR'
+      },
+      operador: CS.user.email,
+      origem: 'PWA_POI_ATIVO',
+      foto: null
+    }, function(res) {
+      if (res && res.ok) {
+        _locaisJaAdicionados.push({ lat: lat, lng: lng });
+        cToast('POI adicionado com sucesso', 'success');
+
+        buscarLocaisPrioritarios(window._gmap.getCenter().lat(), window._gmap.getCenter().lng(), 300);
+
+        if (window._refreshMapa) window._refreshMapa();
+      } else {
+        cToast((res && res.error) || 'Erro ao adicionar POI', 'error');
+      }
+    }, function(err) {
+      cToast('Erro GAS: ' + String(err), 'error');
+    });
+  }, function() {
+    cToast('Falha ao geocodificar POI', 'error');
+  });
+}
+
+function _locPoiCardHtml_(item, cat) {
+  var thumb = _locPoiSvThumb_(item.lat, item.lng);
+  var nome = item.nome || 'POI sem nome';
+
+  return ''
+    + '<div style="padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.04);margin-bottom:8px">'
+    +   '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +     '<div style="width:10px;height:10px;border-radius:50%;background:' + cat.cor + ';flex-shrink:0"></div>'
+    +     '<div style="min-width:0;flex:1">'
+    +       '<div style="font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + nome + '</div>'
+    +       '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + cat.nome + '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   (thumb
+          ? '<img src="' + thumb + '" style="width:100%;height:110px;object-fit:cover;border-radius:8px;border:1px solid rgba(255,255,255,.06);display:block;margin-bottom:8px" onerror="this.remove()">'
+          : '')
+    +   '<div style="font-size:10px;color:rgba(255,255,255,.42);margin-bottom:8px">' + Number(item.lat).toFixed(5) + ', ' + Number(item.lng).toFixed(5) + '</div>'
+    +   '<div style="display:flex;gap:6px">'
+    +     '<button onclick="_locPoiAdicionarDireto(_locaisResultados[\'' + cat.key + '\'].find(function(x){return x.lat===' + Number(item.lat) + '&&x.lng===' + Number(item.lng) + ';}))"'
+    +       ' style="flex:1;padding:8px;border:none;border-radius:8px;background:#10b981;color:#fff;font-size:11px;font-weight:700;cursor:pointer">Adicionar</button>'
+    +     '<button onclick="_locPoiAbrirMapa(' + Number(item.lat) + ',' + Number(item.lng) + ')"'
+    +       ' style="flex:1;padding:8px;border:1px solid rgba(255,255,255,.10);border-radius:8px;background:rgba(255,255,255,.06);color:#fff;font-size:11px;cursor:pointer">Abrir</button>'
+    +     '<button onclick="abrirModalLocal({lat:' + Number(item.lat) + ',lng:' + Number(item.lng) + ',nome:' + JSON.stringify(nome).replace(/"/g, '&quot;') + ',cat:\'' + cat.key + '\'})"'
+    +       ' style="flex:1;padding:8px;border:1px solid rgba(59,130,246,.22);border-radius:8px;background:rgba(59,130,246,.10);color:#60a5fa;font-size:11px;cursor:pointer">Detalhe</button>'
+    +   '</div>'
+    + '</div>';
+}
+
+function _renderLocaisCardsAtivos_() {
+  var lista  = document.getElementById('painelLocaisLista');
+  var contEl = document.getElementById('painelLocaisContador');
+  var btnMostrar = document.getElementById('btnMostrarTodasLocais');
+  if (!lista) return;
+
+  var html = '';
+  var total = 0;
+
+  LOC_CATEGORIAS.forEach(function(cat) {
+    var items = _locaisResultados[cat.key] || [];
+    if (!items.length) return;
+
+    html += '<div style="margin-bottom:10px">'
+      + '<div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:' + cat.cor + ';margin-bottom:6px">' + cat.nome.toUpperCase() + ' • ' + items.length + '</div>';
+
+    items.forEach(function(item) {
+      html += _locPoiCardHtml_(item, cat);
+      total++;
+    });
+
+    html += '</div>';
+  });
+
+  lista.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Nenhum POI ativo disponível</div>';
+  if (contEl) contEl.textContent = '(' + total + ')';
+  if (btnMostrar) btnMostrar.style.display = total > 0 ? 'block' : 'none';
+}
 
 function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   raioMetros = raioMetros || 500;
@@ -11533,10 +11716,21 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     }
   });
 
-  _locaisResultados = porCategoria;
+  _locaisResultados = _locPoiFiltrarDuplicados_(porCategoria, 35);
 
   var total = 0;
-  LOC_CATEGORIAS.forEach(function(cat) { total += (porCategoria[cat.key] || []).length; });
+  LOC_CATEGORIAS.forEach(function(cat) {
+    total += (_locaisResultados[cat.key] || []).length;
+  });
+
+  _renderLocaisCardsAtivos_();
+
+  if (total > 0) {
+    mostrarTodasLocais();
+  } else {
+    _locaisMarkers.forEach(function(m){ m.setMap(null); });
+    _locaisMarkers = [];
+  }
 
   // Renderizar painel
   var lista  = document.getElementById('painelLocaisLista');
@@ -11928,7 +12122,7 @@ function cAbrirLocaisPrioritarios() {
   var gmap = window._gmap;
   if (!gmap) { cToast('Mapa nao carregado', 'warn'); return; }
   var center = gmap.getCenter();
-  buscarLocaisPrioritarios(center.lat(), center.lng(), 300);
+  buscarLocaisPrioritarios(center.lat(), center.lng(), 400);
 }
 
 function cMostrarClickModal(latLng, domEvent) {
