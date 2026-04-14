@@ -11482,21 +11482,52 @@ function vrrAdicionarAprovados() {
 
 var LOC_CATEGORIAS = [
   { key: 'restaurante', nome: 'Restaurante / Cafe', cor: '#f97316',
-    query: 'node["amenity"~"restaurant|cafe|fast_food"]' },
-  { key: 'hotel', nome: 'Hotel', cor: '#8b5cf6',
-    query: 'node["tourism"~"hotel|hostel|motel"]' },
-  { key: 'comercial', nome: 'Comercial', cor: '#f59e0b',
-    query: 'node["shop"~"mall|supermarket|department_store"]' },
+    query: 'node["amenity"~"restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten"]' },
+
+  { key: 'hotel', nome: 'Hotel / Hospedagem', cor: '#8b5cf6',
+    query: 'node["tourism"~"hotel|hostel|motel|guest_house|apartment"]' },
+
+  { key: 'shopping', nome: 'Shopping / Varejo', cor: '#f59e0b',
+    query: 'node["shop"~"mall|department_store|supermarket|convenience|wholesale|retail"]' },
+
+  { key: 'mercado', nome: 'Mercado / Atacado', cor: '#fbbf24',
+    query: 'node["shop"~"supermarket|convenience|greengrocer|bakery|butcher|wholesale"]' },
+
   { key: 'transporte', nome: 'Transporte', cor: '#38bdf8',
-    query: 'node["public_transport"~"station|stop_position"]' },
-  { key: 'academia', nome: 'Academia', cor: '#4ade80',
-    query: 'node["leisure"="fitness_centre"]' },
-  { key: 'educacao', nome: 'Educacao', cor: '#818cf8',
-    query: 'node["amenity"~"school|university|college"]' },
-  { key: 'saude', nome: 'Saude', cor: '#f87171',
-    query: 'node["amenity"~"hospital|clinic|pharmacy"]' },
-  { key: 'escritorio', nome: 'Escritorio / Banco', cor: '#94a3b8',
-    query: 'node["amenity"~"bank|office"]["office"]' }
+    query: 'node["public_transport"~"station|stop_position|platform"]'
+         + ';node["amenity"="bus_station"]'
+         + ';node["railway"~"station|halt|tram_stop|subway_entrance"]' },
+
+  { key: 'estacionamento', nome: 'Estacionamento', cor: '#06b6d4',
+    query: 'node["amenity"~"parking|parking_entrance|bicycle_parking|motorcycle_parking"]' },
+
+  { key: 'academia', nome: 'Academia / Esporte', cor: '#22c55e',
+    query: 'node["leisure"~"fitness_centre|sports_centre|stadium|pitch|swimming_pool"]'
+         + ';node["sport"]' },
+
+  { key: 'parque', nome: 'Parque / Lazer', cor: '#10b981',
+    query: 'node["leisure"~"park|playground|garden|recreation_ground"]'
+         + ';node["tourism"="zoo"]' },
+
+  { key: 'educacao', nome: 'Educacao', cor: '#6366f1',
+    query: 'node["amenity"~"school|university|college|kindergarten|library"]' },
+
+  { key: 'saude', nome: 'Saude', cor: '#ef4444',
+    query: 'node["amenity"~"hospital|clinic|pharmacy|doctors|dentist|laboratory"]' },
+
+  { key: 'banco', nome: 'Banco / ATM', cor: '#94a3b8',
+    query: 'node["amenity"~"bank|atm|bureau_de_change"]' },
+
+  { key: 'escritorio', nome: 'Escritorio / Coworking', cor: '#64748b',
+    query: 'node["office"]'
+         + ';node["amenity"~"coworking_space|conference_centre"]' },
+
+  { key: 'entretenimento', nome: 'Entretenimento', cor: '#a855f7',
+    query: 'node["amenity"~"cinema|theatre|arts_centre|events_venue|nightclub"]'
+         + ';node["leisure"~"bowling_alley|escape_game|amusement_arcade"]' },
+
+  { key: 'turismo', nome: 'Turismo / Cultura', cor: '#ec4899',
+    query: 'node["tourism"~"museum|gallery|attraction|viewpoint|artwork"]' }
 ];
 
 var _locaisResultados = {};
@@ -11731,7 +11762,7 @@ function _renderLocaisCardsAtivos_() {
 }
 
 function buscarLocaisPrioritarios(lat, lng, raioMetros) {
-  raioMetros = raioMetros || 500;
+  raioMetros = raioMetros || 900;
   _locaisResultados = {};
   _locaisMarkers.forEach(function(m){ m.setMap(null); });
   _locaisMarkers = [];
@@ -11805,25 +11836,57 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     var tags = el.tags || {};
     var cat = null;
 
-    if (tags.amenity && /restaurant|cafe|fast_food/.test(tags.amenity)) cat = 'restaurante';
-    else if (tags.tourism && /hotel|hostel|motel/.test(tags.tourism)) cat = 'hotel';
-    else if (tags.shop && /mall|supermarket|department_store/.test(tags.shop)) cat = 'comercial';
-    else if (tags.public_transport && /station|stop_position/.test(tags.public_transport)) cat = 'transporte';
-    else if (tags.leisure === 'fitness_centre') cat = 'academia';
-    else if (tags.amenity && /school|university|college/.test(tags.amenity)) cat = 'educacao';
-    else if (tags.amenity && /hospital|clinic|pharmacy/.test(tags.amenity)) cat = 'saude';
-    else if (tags.amenity === 'bank' || tags.office) cat = 'escritorio';
+    if (tags.amenity && /restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|biergarten/.test(tags.amenity)) {
+      cat = 'restaurante';
+    } else if (tags.tourism && /hotel|hostel|motel|guest_house|apartment/.test(tags.tourism)) {
+      cat = 'hotel';
+    } else if (tags.shop && /mall|department_store|retail/.test(tags.shop)) {
+      cat = 'shopping';
+    } else if (tags.shop && /supermarket|convenience|greengrocer|bakery|butcher|wholesale/.test(tags.shop)) {
+      cat = 'mercado';
+    } else if (
+      (tags.public_transport && /station|stop_position|platform/.test(tags.public_transport)) ||
+      tags.amenity === 'bus_station' ||
+      (tags.railway && /station|halt|tram_stop|subway_entrance/.test(tags.railway))
+    ) {
+      cat = 'transporte';
+    } else if (tags.amenity && /parking|parking_entrance|bicycle_parking|motorcycle_parking/.test(tags.amenity)) {
+      cat = 'estacionamento';
+    } else if (
+      (tags.leisure && /fitness_centre|sports_centre|stadium|pitch|swimming_pool/.test(tags.leisure)) ||
+      !!tags.sport
+    ) {
+      cat = 'academia';
+    } else if (
+      (tags.leisure && /park|playground|garden|recreation_ground/.test(tags.leisure)) ||
+      tags.tourism === 'zoo'
+    ) {
+      cat = 'parque';
+    } else if (tags.amenity && /school|university|college|kindergarten|library/.test(tags.amenity)) {
+      cat = 'educacao';
+    } else if (tags.amenity && /hospital|clinic|pharmacy|doctors|dentist|laboratory/.test(tags.amenity)) {
+      cat = 'saude';
+    } else if (tags.amenity && /bank|atm|bureau_de_change/.test(tags.amenity)) {
+      cat = 'banco';
+    } else if (!!tags.office || (tags.amenity && /coworking_space|conference_centre/.test(tags.amenity))) {
+      cat = 'escritorio';
+    } else if (
+      (tags.amenity && /cinema|theatre|arts_centre|events_venue|nightclub/.test(tags.amenity)) ||
+      (tags.leisure && /bowling_alley|escape_game|amusement_arcade/.test(tags.leisure))
+    ) {
+      cat = 'entretenimento';
+    } else if (tags.tourism && /museum|gallery|attraction|viewpoint|artwork/.test(tags.tourism)) {
+      cat = 'turismo';
+    }
 
     var lat = Number(el.lat);
     var lng = Number(el.lon);
     if (!cat || !isFinite(lat) || !isFinite(lng)) return;
 
-    var nome = (tags.name || tags['name:pt'] || '').trim();
-
     porCategoria[cat].push({
       lat: lat,
       lng: lng,
-      nome: nome,
+      nome: (tags.name || tags['name:pt'] || '').trim(),
       cat: cat,
       dist: distM(centerLat, centerLng, lat, lng)
     });
@@ -11839,11 +11902,7 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
       return (a.dist || 999999) - (b.dist || 999999);
     });
 
-    if (lista.length > 12) {
-      var comNome = lista.filter(function(x){ return !!x.nome; });
-      var semNome = lista.filter(function(x){ return !x.nome; }).slice(0, 3);
-      porCategoria[cat.key] = comNome.concat(semNome);
-    }
+    porCategoria[cat.key] = lista.slice(0, 18);
   });
 
   _locaisResultados = _locPoiFiltrarDuplicados_(porCategoria, 35);
@@ -12278,7 +12337,7 @@ function cAbrirLocaisPrioritarios() {
   var gmap = window._gmap;
   if (!gmap) { cToast('Mapa nao carregado', 'warn'); return; }
   var center = gmap.getCenter();
-  buscarLocaisPrioritarios(center.lat(), center.lng(), 400);
+  buscarLocaisPrioritarios(center.lat(), center.lng(), 700);
 }
 
 function cMostrarClickModal(latLng, domEvent) {
