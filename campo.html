@@ -2462,39 +2462,53 @@ input:focus, select:focus {
     </div>
 
     <!-- Botões pós-análise -->
-    <div id="mlpBotoesPos" style="display:none;flex-direction:column;gap:8px">
-      <button onclick="mlpAdicionarDireto()" id="mlpBtnAdicionar" style="
-        width:100%;padding:12px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:700;
-        background:linear-gradient(135deg,#059669,#10b981);color:white;
-        display:flex;align-items:center;justify-content:center;gap:8px">
-        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+<div id="mlpBotoesPos" style="display:none;flex-direction:column;gap:8px">
+  <button onclick="_mlpAbrirStreetViewManual()" style="
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:700;
+    background:rgba(59,130,246,.12);
+    border:1px solid rgba(59,130,246,.28);
+    color:#60a5fa;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px">
+    Abrir Street View manual
+  </button>
 
-<button onclick="_mlpAbrirStreetViewManual()" style="
-  width:100%;
-  padding:12px;
-  border-radius:10px;
-  cursor:pointer;
-  font-size:13px;
-  font-weight:700;
-  background:rgba(59,130,246,.12);
-  border:1px solid rgba(59,130,246,.28);
-  color:#60a5fa;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  gap:8px">
-  Abrir Street View manual
-</button>
+  <button onclick="mlpAdicionarDireto()" id="mlpBtnAdicionar" style="
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:none;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:700;
+    background:linear-gradient(135deg,#059669,#10b981);
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px">
+    Adicionar estação aqui
+  </button>
 
-        Adicionar estacao aqui
-      </button>
-      <button onclick="mlpAnalisarIA()" style="
-        width:100%;padding:10px;border-radius:10px;cursor:pointer;font-size:12px;
-        background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.5)">
-        Re-analisar
-      </button>
-    </div>
-  </div>
+  <button onclick="mlpAnalisarIA()" style="
+    width:100%;
+    padding:10px;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:12px;
+    background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.08);
+    color:rgba(255,255,255,.5)">
+    Re-analisar
+  </button>
+</div>  </div>
 </div>
 
 <style>
@@ -6774,28 +6788,40 @@ function cUpdatePendBanner() {
 }
 
 function cSyncPendentes() {
-  if (!CS.user) return;
+  if (!CS.user || !CS.user.email) return;
+
   var pend = (CS.records || []).filter(function(r){ return r.sync === 'PENDING'; });
   if (!pend.length) return;
 
   Promise.all(pend.map(function(r) {
     var payload = {
-      tokenId: CS.user.tokenId,
-      lat: r.lat, lng: r.lng,
-      tipo: r.tipo, modalidade: r.modalidade || 'PATINETE',
-      nomeConcorrente: r.nomeConc || '', observacoes: r.obs || '',
-      geo: { cidade: r.cidade, bairro: r.bairro, endereco: r.end, pais: r.pais || 'BR' },
+      email: CS.user.email || '',
+      lat: r.lat,
+      lng: r.lng,
+      tipo: r.tipo,
+      modalidade: r.modalidade || 'PATINETE',
+      nomeConcorrente: r.nomeConc || '',
+      observacoes: r.obs || '',
+      geo: {
+        cidade: r.cidade,
+        bairro: r.bairro,
+        endereco: r.end,
+        pais: r.pais || 'BR'
+      },
       status: 'SOLICITADO',
-      operador: CS.user.email, origem: 'PWA_CAMPO',
+      dimensoes: r.dimensoes || '',
+      larguraFaixa: r.larguraFaixa || '',
+      operador: CS.user.email,
+      origem: 'PWA_CAMPO',
       foto: r.photoB64 ? { base64: r.photoB64, mime: r.photoMime || 'image/jpeg', name: 'foto.jpg' } : null
     };
+
     return new Promise(function(resolve) {
       _gasRun('addEstacaoFromMapa', payload,
         function(res) {
           if (res && res.ok) {
             r.sync = 'SYNCED';
             cPut(r).then(function() {
-              // Adicionar ao mapa local se ainda nao esta
               if (window.estacoes && res.estacao) {
                 var j = window.estacoes.findIndex(function(e){ return e.lid === r.lid; });
                 if (j < 0) {
@@ -6806,19 +6832,26 @@ function cSyncPendentes() {
                   est.tipo = est.tipo || r.tipo;
                   est.modalidade = r.modalidade || 'PATINETE';
                   est.statusEstacao = 'SOLICITADO';
+                  est.endereco = est.endereco || r.end;
+                  est.cidade = est.cidade || r.cidade;
+                  est.bairro = est.bairro || r.bairro;
                   window.estacoes.push(est);
-                  if (window._refreshMapa) window._refreshMapa();
                 }
               }
               resolve();
             });
-          } else resolve();
+          } else {
+            resolve();
+          }
         },
-        function() { resolve(); });
+        function() { resolve(); }
+      );
     });
-  })).then(function() { cLoadRecords(); });
+  })).then(function() {
+    cLoadRecords();
+    if (window._refreshMapa) window._refreshMapa();
+  });
 }
-
 document.getElementById('cpbSyncBtn').onclick = cSyncPendentes;
 </script>
 
@@ -7109,34 +7142,20 @@ function cpToggleMin() {
 
 /* ---- SUBMIT NOVA ESTACAO ---- */
 async function cSubmit() {
-  if (!CS.lat || !CS.lng) { cToast('Posicione o pin no mapa primeiro', 'error'); return; }
-  if (!CS.tipo) { cToast('Selecione o tipo da estacao', 'error'); return; }
+  if (!CS.user) { cToast('Faça login novamente', 'error'); return; }
+  if (CS.lat == null || CS.lng == null) { cToast('Defina o ponto no mapa', 'error'); return; }
+  if (!CS.endereco) { cToast('Informe/busque o endereço', 'error'); return; }
+  if (!CS.tipo) { cToast('Selecione o tipo', 'error'); return; }
+  if (!CS.modalidade) CS.modalidade = 'PATINETE';
 
-  // Capturar campos do DOM ANTES de qualquer validacao
   CS.obs = ((document.getElementById('cObs') || {}).value || '').trim();
-  var dimSel = document.getElementById('cDimensoes');
-  var dimOut = document.getElementById('cDimensoesOutro');
-  CS.dimensoes = dimSel && dimSel.value === '__outro__'
-    ? ((dimOut && dimOut.value) || '').trim()
-    : (dimSel ? dimSel.value : '') || '';
-  // Capturar largura -- com fallback do data-largura do option selecionado
-  var _cLargEl  = document.getElementById('cLarguraFaixa');
-  var _cLargVal = (_cLargEl && _cLargEl.value || '').trim();
-  // Fallback: se campo vazio mas há dimensão predefinida, usar data-largura
-  if (!_cLargVal) {
-    var _dimSel2 = document.getElementById('cDimensoes');
-    if (_dimSel2 && _dimSel2.selectedIndex > 0 && _dimSel2.value !== '__outro__') {
-      var _opt = _dimSel2.options[_dimSel2.selectedIndex];
-      _cLargVal = (_opt && _opt.getAttribute('data-largura')) || '';
-    }
-  }
-  CS.larguraFaixa = _cLargVal.replace(',', '.');
+  if (CS.obs && CS.obs.length > 500) { cToast('Observações: máximo de 500 caracteres', 'error'); return; }
 
-  // Validacoes
   if (CS.tipo === 'CONCORRENTE') {
     CS.nomeConc = ((document.getElementById('cNomeConc') || {}).value || '').trim();
     if (!CS.nomeConc) { cToast('Informe o nome do concorrente', 'error'); return; }
   }
+
   if (CS.tipo === 'PUBLICA' && CS.larguraFaixa) {
     var largCheck = validarLargura(CS.larguraFaixa);
     if (!largCheck.ok) { cToast(largCheck.msg, 'error'); return; }
@@ -7148,42 +7167,72 @@ async function cSubmit() {
 
   var lid = 'L' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
   var photoB64 = null, photoMime = null;
-  if (CS.photoDataUrl) { photoB64 = CS.photoDataUrl.split(',')[1]; photoMime = 'image/jpeg'; }
+  if (CS.photoDataUrl) {
+    photoB64 = CS.photoDataUrl.split(',')[1];
+    photoMime = 'image/jpeg';
+  }
 
   var rec = {
-    lid: lid, lat: CS.lat, lng: CS.lng,
-    end: CS.endereco, bairro: CS.bairro, cidade: CS.cidade, pais: CS.pais,
-    tipo: CS.tipo, modalidade: CS.modalidade || 'PATINETE',
-    nomeConc: CS.nomeConc, obs: CS.obs,
-    dimensoes: CS.dimensoes || '', larguraFaixa: CS.larguraFaixa || '',
-    photoB64: photoB64, photoMime: photoMime,
+    lid: lid,
+    lat: CS.lat,
+    lng: CS.lng,
+    end: CS.endereco,
+    bairro: CS.bairro,
+    cidade: CS.cidade,
+    pais: CS.pais,
+    tipo: CS.tipo,
+    modalidade: CS.modalidade || 'PATINETE',
+    nomeConc: CS.nomeConc,
+    obs: CS.obs,
+    dimensoes: CS.dimensoes || '',
+    larguraFaixa: CS.larguraFaixa || '',
+    photoB64: photoB64,
+    photoMime: photoMime,
     operador: CS.user && CS.user.email,
-    cat: Date.now(), sync: 'PENDING'
+    cat: Date.now(),
+    sync: 'PENDING'
   };
 
   await cPut(rec);
+  cLoadRecords();
 
-  if (navigator.onLine && CS.user) {
+  var synced = false;
+
+  if (navigator.onLine && CS.user && CS.user.email) {
     try {
       var payload = {
         email: CS.user.email || '',
-        lat: rec.lat, lng: rec.lng,
-        tipo: rec.tipo, modalidade: rec.modalidade || 'PATINETE',
-        nomeConcorrente: rec.nomeConc || '', observacoes: rec.obs || '',
+        lat: rec.lat,
+        lng: rec.lng,
+        tipo: rec.tipo,
+        modalidade: rec.modalidade || 'PATINETE',
+        nomeConcorrente: rec.nomeConc || '',
+        observacoes: rec.obs || '',
         status: 'SOLICITADO',
         dimensoes: rec.dimensoes || '',
         larguraFaixa: rec.larguraFaixa || '',
-        geo: { cidade: rec.cidade, bairro: rec.bairro, endereco: rec.end, pais: rec.pais },
-        operador: CS.user.email, origem: 'PWA_CAMPO',
+        geo: {
+          cidade: rec.cidade,
+          bairro: rec.bairro,
+          endereco: rec.end,
+          pais: rec.pais
+        },
+        operador: CS.user.email,
+        origem: 'PWA_CAMPO',
         foto: rec.photoB64 ? { base64: rec.photoB64, mime: rec.photoMime, name: 'foto.jpg' } : null
       };
+
       var res = await new Promise(function(resolve) {
-        _gasRun('addEstacaoFromMapa', payload, resolve,
-          function(e){ resolve({ ok: false, error: String(e) }); });
+        _gasRun('addEstacaoFromMapa', payload, resolve, function(e) {
+          resolve({ ok: false, error: String(e) });
+        });
       });
+
       if (res && res.ok) {
         rec.sync = 'SYNCED';
         await cPut(rec);
+        synced = true;
+
         if (window.estacoes) {
           var novaEst = res.estacao || {};
           novaEst.lat           = novaEst.lat          || rec.lat;
@@ -7195,40 +7244,39 @@ async function cSubmit() {
           novaEst.cidade        = novaEst.cidade       || rec.cidade;
           novaEst.bairro        = novaEst.bairro       || rec.bairro;
           novaEst.fotoUrl       = novaEst.foto         || novaEst.fotoUrl || '';
-          // Garantir __id unico antes do render
-          novaEst.__id = novaEst.codigo
-            ? ('COD:' + novaEst.codigo)
-            : ('tmp-' + Date.now());
+          novaEst.__id = novaEst.codigo ? ('COD:' + novaEst.codigo) : ('tmp-' + Date.now());
+
           window.estacoes.push(novaEst);
-          // Atualizar estacoesPorCidade para o render usar
+
           if (window.estacoesPorCidade && novaEst.cidade) {
             if (!window.estacoesPorCidade[novaEst.cidade]) window.estacoesPorCidade[novaEst.cidade] = [];
             window.estacoesPorCidade[novaEst.cidade].push(novaEst);
           }
-          // Invalidar cache de grid e re-renderizar SEM reload do servidor
-          if (window._mapInvalidateGrid && novaEst.cidade) window._mapInvalidateGrid(novaEst.cidade);
-          if (window._mapInvalidateCache) window._mapInvalidateCache();
+
           if (window._refreshMapa) window._refreshMapa();
-          // Remover pin de aprovado da varredura (agora e estacao oficial)
-          if (window._vrrAprovadosMarkers) {
-            window._vrrAprovadosMarkers = window._vrrAprovadosMarkers.filter(function(m) {
-              var pos = m.getPosition();
-              if (pos && Math.abs(pos.lat() - rec.lat) < 0.0001 && Math.abs(pos.lng() - rec.lng) < 0.0001) {
-                m.setMap(null);
-                return false;
-              }
-              return true;
-            });
-          }
         }
+      } else {
+        console.warn('[cSubmit] ficou pendente:', res && res.error);
       }
-    } catch(e) {}
+    } catch (e) {
+      console.warn('[cSubmit] erro:', e);
+    }
   }
 
-  await cLoadRecords();
+  cLoadRecords();
+
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Salvar Estação';
+  }
+
+  if (synced) {
+    cToast('Estação salva com sucesso', 'success');
+  } else {
+    cToast('Salva localmente. Toque em Sincronizar.', 'warn');
+  }
+
   cCloseDrawer();
-  cToast('Estacao registrada!', 'success');
-  if (btn) { btn.disabled = false; btn.textContent = 'Salvar Estacao'; }
 }
 
 /* ---- INFOWINDOW COM FOTO ---- */
@@ -11690,14 +11738,13 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
 }
 
 function _processarResultadosLocais_(elements, centerLat, centerLng) {
-  // Classificar por categoria
   var porCategoria = {};
   LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
 
   elements.forEach(function(el) {
     var tags = el.tags || {};
-    // Detectar categoria
     var cat = null;
+
     if (tags.amenity && /restaurant|cafe|fast_food/.test(tags.amenity)) cat = 'restaurante';
     else if (tags.tourism && /hotel|hostel|motel/.test(tags.tourism)) cat = 'hotel';
     else if (tags.shop && /mall|supermarket|department_store/.test(tags.shop)) cat = 'comercial';
@@ -11709,7 +11756,8 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
 
     if (cat && el.lat && el.lon) {
       porCategoria[cat].push({
-        lat: el.lat, lng: el.lon,
+        lat: Number(el.lat),
+        lng: Number(el.lon),
         nome: tags.name || tags['name:pt'] || '',
         cat: cat
       });
@@ -11731,29 +11779,8 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
     _locaisMarkers.forEach(function(m){ m.setMap(null); });
     _locaisMarkers = [];
   }
-
-  // Renderizar painel
-  var lista  = document.getElementById('painelLocaisLista');
-  var contEl = document.getElementById('painelLocaisContador');
-  var btnMostrar = document.getElementById('btnMostrarTodasLocais');
-
-  contEl.textContent = '(' + total + ')';
-
-  var html = '';
-  LOC_CATEGORIAS.forEach(function(cat) {
-    var n = (porCategoria[cat.key] || []).length;
-    if (n === 0) return;
-    var catKey = cat.key;
-    html += '<div class="loc-pri-linha" onclick="filtrarLocaisCategoria(\"' + catKey + '\")">' + '<div class="loc-pri-dot" style="background:' + cat.cor + '"></div>' + '<div class="loc-pri-nome">' + cat.nome + '</div>' + '<div class="loc-pri-count" style="color:' + cat.cor + '">' + n + '</div>'
-      + '</div>';
-  });
-
-  lista.innerHTML = html || '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:8px">Nenhum local encontrado</div>';
-  if (btnMostrar) btnMostrar.style.display = total > 0 ? 'block' : 'none';
-
-  // Mostrar markers de todos por default
-  mostrarTodasLocais();
 }
+
 
 function _criarMarkerLocal_(item, cor) {
   if (!window._gmap || !window.google) return null;
@@ -11839,15 +11866,64 @@ function _mlpStreetPreviewUrl_(lat, lng) {
     + '&key=' + key;
 }
 
-function _mlpStreetPreviewUrl_(lat, lng) {
-  var key = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
-  if (!key) return '';
-  return 'https://maps.googleapis.com/maps/api/streetview?size=900x450'
-    + '&location=' + Number(lat) + ',' + Number(lng)
-    + '&fov=90'
-    + '&pitch=0'
-    + '&source=outdoor'
-    + '&key=' + key;
+function abrirModalLocal(item) {
+  _mlpItem = item;
+  _mlpGeocodedAddr = null;
+
+  var modal = document.getElementById('modalLocalPri');
+  if (!modal) return;
+
+  var cat = LOC_CATEGORIAS.find(function(c){ return c.key === item.cat; });
+
+  var elCat = document.getElementById('mlpCategoria');
+  var elNome = document.getElementById('mlpNome');
+  var elEnd = document.getElementById('mlpEndereco');
+
+  if (elCat) {
+    elCat.textContent = cat ? cat.nome.toUpperCase() : String(item.cat || '').toUpperCase();
+    elCat.style.color = cat ? cat.cor : '#60a5fa';
+  }
+  if (elNome) elNome.textContent = item.nome || 'Local sem nome';
+  if (elEnd) elEnd.textContent = Number(item.lat).toFixed(5) + ', ' + Number(item.lng).toFixed(5);
+
+  var svImg = document.getElementById('mlpStreetImg');
+  var svPh  = document.getElementById('mlpStreetPlaceholder');
+
+  if (svImg && svPh) {
+    svImg.style.display = 'none';
+    svPh.style.display = 'flex';
+    svPh.textContent = 'Carregando Street View...';
+
+    var url = _mlpStreetPreviewUrl_(item.lat, item.lng);
+    if (url) {
+      svImg.onload = function() {
+        svImg.style.display = 'block';
+        svPh.style.display = 'none';
+      };
+      svImg.onerror = function() {
+        svImg.style.display = 'none';
+        svPh.style.display = 'flex';
+        svPh.textContent = 'Street View indisponível';
+      };
+      svImg.src = url;
+    } else {
+      svPh.textContent = 'Chave Maps indisponível';
+    }
+  }
+
+  var elResultado = document.getElementById('mlpResultadoIA');
+  var elBtnsIni   = document.getElementById('mlpBotoesInicial');
+  var elBtnsPos   = document.getElementById('mlpBotoesPos');
+  var elLoading   = document.getElementById('mlpLoadingIA');
+
+  if (elResultado) elResultado.style.display = 'none';
+  if (elBtnsIni)   elBtnsIni.style.display = 'none';
+  if (elBtnsPos)   elBtnsPos.style.display = 'flex';
+  if (elLoading)   elLoading.style.display = 'none';
+
+  modal.style.display = 'block';
+
+  _mlpGeocodeReverso_(item.lat, item.lng);
 }
 
 function fecharModalLocal() {
