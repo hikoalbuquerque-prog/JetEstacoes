@@ -1206,6 +1206,35 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
 }
 
 /* TOAST */
+<div id="svAjusteModal" style="display:none;position:fixed;inset:0;z-index:99050;background:rgba(0,0,0,.72);backdrop-filter:blur(4px)">
+  <div style="position:absolute;inset:24px;display:flex;align-items:center;justify-content:center">
+    <div style="width:min(1100px,96vw);height:min(760px,92vh);background:#0c1423;border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column">
+      <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:10px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:11px;letter-spacing:.08em;color:#60a5fa;font-weight:800">STREET VIEW MANUAL</div>
+          <div id="svAjusteTitulo" style="font-size:14px;font-weight:700;color:#fff;margin-top:2px">Ajustar ponto</div>
+          <div id="svAjusteCoords" style="font-size:11px;color:rgba(255,255,255,.45);margin-top:2px">--</div>
+        </div>
+        <button onclick="_svAjusteReset()" style="padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;cursor:pointer;font-size:12px">Voltar ao original</button>
+        <button onclick="_svAjusteAplicar()" style="padding:8px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;font-size:12px;font-weight:700">Usar posição atual</button>
+        <button onclick="_svAjusteFechar()" style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:rgba(255,255,255,.6);cursor:pointer;font-size:16px">×</button>
+      </div>
+
+      <div id="svAjustePanorama" style="flex:1;min-height:280px;background:#0b1220"></div>
+
+      <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POSIÇÃO ATUAL</div>
+          <div id="svAjusteAtual" style="font-size:12px;color:#fff;margin-top:2px">--</div>
+        </div>
+        <div style="min-width:0;flex:1;text-align:right">
+          <div style="font-size:10px;color:rgba(255,255,255,.38);letter-spacing:.08em">POV ATUAL</div>
+          <div id="svAjustePov" style="font-size:12px;color:#fff;margin-top:2px">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 #campoToast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(8px);z-index:99000;background:rgba(17,24,39,.96);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:9px 16px;font-size:13px;color:white;white-space:nowrap;opacity:0;transition:.2s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.4)}
 #campoToast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #campoToast.success{border-color:rgba(34,197,94,.3);color:#4ade80}
@@ -2439,6 +2468,24 @@ input:focus, select:focus {
         background:linear-gradient(135deg,#059669,#10b981);color:white;
         display:flex;align-items:center;justify-content:center;gap:8px">
         <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+
+<button onclick="_mlpAbrirStreetViewManual()" style="
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  cursor:pointer;
+  font-size:13px;
+  font-weight:700;
+  background:rgba(59,130,246,.12);
+  border:1px solid rgba(59,130,246,.28);
+  color:#60a5fa;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px">
+  Abrir Street View manual
+</button>
+
         Adicionar estacao aqui
       </button>
       <button onclick="mlpAnalisarIA()" style="
@@ -10029,11 +10076,11 @@ if (modo === 'osm') {
       cToast('Nenhum candidato OSM encontrado ou serviço indisponível.', 'warn');
       return;
     }
-    _processarComFuros(pontos);
+    _processarComFuros(_filtrarDuplicadosAnalise_(pontos, 30));
   });
 } else {
   var step = Number(modo) || 250;
-  _processarComFuros(_vrrGerarGrid(centro, raio, step));
+  _processarComFuros(_filtrarDuplicadosAnalise_(_vrrGerarGrid(centro, raio, step), 30));
 }
 }
 
@@ -10745,6 +10792,220 @@ function _vrrTogglePermitirReprovados() {
   _vrrAtualizarLote();
 }
 
+
+var _svAjusteCtx = null;
+var _svPanorama = null;
+
+function _fmtLatLng_(lat, lng) {
+  return Number(lat).toFixed(6) + ', ' + Number(lng).toFixed(6);
+}
+
+function _svThumbUrl_(lat, lng, heading, pitch) {
+  var mapsKey = window._MAPS_KEY || window.MAPS_KEY || '';
+  if (!mapsKey) return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=800x400'
+    + '&location=' + Number(lat) + ',' + Number(lng)
+    + '&fov=90'
+    + '&heading=' + encodeURIComponent(Number(heading || 0))
+    + '&pitch=' + encodeURIComponent(Number(pitch || 0))
+    + '&key=' + mapsKey;
+}
+
+function _distMProx_(lat1, lng1, lat2, lng2) {
+  try {
+    return google.maps.geometry.spherical.computeDistanceBetween(
+      new google.maps.LatLng(Number(lat1), Number(lng1)),
+      new google.maps.LatLng(Number(lat2), Number(lng2))
+    );
+  } catch (e) {
+    return 999999;
+  }
+}
+
+function _jaExisteMuitoProximo_(lat, lng, distMinM) {
+  distMinM = Number(distMinM || 30);
+
+  var all = [];
+  if (Array.isArray(window.estacoes)) all = all.concat(window.estacoes);
+  if (Array.isArray(window._vrrJaAdicionados)) all = all.concat(window._vrrJaAdicionados);
+  if (Array.isArray(window._vrrAprovados)) all = all.concat(window._vrrAprovados);
+
+  for (var i = 0; i < all.length; i++) {
+    var p = all[i];
+    if (!p || p.lat == null || p.lng == null) continue;
+    if (_distMProx_(lat, lng, p.lat, p.lng) < distMinM) return true;
+  }
+  return false;
+}
+
+function _filtrarDuplicadosAnalise_(pontos, distMinM) {
+  distMinM = Number(distMinM || 30);
+  return (pontos || []).filter(function(p) {
+    return !_jaExisteMuitoProximo_(p.lat, p.lng, distMinM);
+  });
+}
+
+function _vrrAbrirPontoItem(btn) {
+  var item = btn.closest('.vrr-item');
+  if (!item) return;
+  _vrrAdicionarPonto(Number(item.dataset.lat), Number(item.dataset.lng));
+}
+
+function _vrrAbrirStreetViewItem(btn) {
+  var item = btn.closest('.vrr-item');
+  if (!item) return;
+
+  _svAjusteAbrir({
+    mode: 'vrr',
+    itemEl: item,
+    lat: Number(item.dataset.lat),
+    lng: Number(item.dataset.lng),
+    title: 'Ajustar candidato da varredura'
+  });
+}
+
+function _mlpAbrirStreetViewManual() {
+  if (!_mlpItem) return;
+
+  _svAjusteAbrir({
+    mode: 'mlp',
+    lat: Number(_mlpItem.lat),
+    lng: Number(_mlpItem.lng),
+    title: (_mlpItem.nome || 'Local prioritário')
+  });
+}
+
+function _svAjusteAbrir(ctx) {
+  if (!window.google || !window.google.maps || !window.google.maps.StreetViewPanorama) {
+    cToast('Street View indisponível.', 'warn');
+    return;
+  }
+
+  _svAjusteCtx = {
+    mode: ctx.mode,
+    itemEl: ctx.itemEl || null,
+    originalLat: Number(ctx.lat),
+    originalLng: Number(ctx.lng),
+    currentLat: Number(ctx.lat),
+    currentLng: Number(ctx.lng),
+    currentPov: { heading: 0, pitch: 0 },
+    title: ctx.title || 'Ajustar ponto'
+  };
+
+  var modal = document.getElementById('svAjusteModal');
+  var panoEl = document.getElementById('svAjustePanorama');
+  if (!modal || !panoEl) return;
+
+  document.getElementById('svAjusteTitulo').textContent = _svAjusteCtx.title;
+  document.getElementById('svAjusteCoords').textContent = 'Original: ' + _fmtLatLng_(_svAjusteCtx.originalLat, _svAjusteCtx.originalLng);
+  document.getElementById('svAjusteAtual').textContent = _fmtLatLng_(_svAjusteCtx.currentLat, _svAjusteCtx.currentLng);
+  document.getElementById('svAjustePov').textContent = 'heading 0° • pitch 0°';
+
+  modal.style.display = 'block';
+
+  _svPanorama = new google.maps.StreetViewPanorama(panoEl, {
+    position: { lat: _svAjusteCtx.originalLat, lng: _svAjusteCtx.originalLng },
+    pov: { heading: 0, pitch: 0 },
+    motionTracking: false,
+    showRoadLabels: true,
+    addressControl: false,
+    fullscreenControl: true,
+    linksControl: true,
+    panControl: true,
+    enableCloseButton: false,
+    zoomControl: true
+  });
+
+  _svPanorama.addListener('position_changed', function() {
+    var pos = _svPanorama.getPosition();
+    if (!pos) return;
+    _svAjusteCtx.currentLat = pos.lat();
+    _svAjusteCtx.currentLng = pos.lng();
+    var el = document.getElementById('svAjusteAtual');
+    if (el) el.textContent = _fmtLatLng_(_svAjusteCtx.currentLat, _svAjusteCtx.currentLng);
+  });
+
+  _svPanorama.addListener('pov_changed', function() {
+    var pov = _svPanorama.getPov() || { heading: 0, pitch: 0 };
+    _svAjusteCtx.currentPov = {
+      heading: Number(pov.heading || 0),
+      pitch: Number(pov.pitch || 0)
+    };
+    var el = document.getElementById('svAjustePov');
+    if (el) {
+      el.textContent = 'heading ' + Math.round(_svAjusteCtx.currentPov.heading) + '° • pitch ' + Math.round(_svAjusteCtx.currentPov.pitch) + '°';
+    }
+  });
+
+  setTimeout(function() {
+    google.maps.event.trigger(_svPanorama, 'resize');
+  }, 80);
+}
+
+function _svAjusteReset() {
+  if (!_svPanorama || !_svAjusteCtx) return;
+  _svPanorama.setPosition({ lat: _svAjusteCtx.originalLat, lng: _svAjusteCtx.originalLng });
+  _svPanorama.setPov({ heading: 0, pitch: 0 });
+}
+
+function _svAjusteAplicar() {
+  if (!_svAjusteCtx) return;
+
+  var lat = Number(_svAjusteCtx.currentLat);
+  var lng = Number(_svAjusteCtx.currentLng);
+  var pov = _svAjusteCtx.currentPov || { heading: 0, pitch: 0 };
+
+  if (!isFinite(lat) || !isFinite(lng)) {
+    cToast('Posição Street View inválida.', 'warn');
+    return;
+  }
+
+  if (_svAjusteCtx.mode === 'vrr' && _svAjusteCtx.itemEl) {
+    var item = _svAjusteCtx.itemEl;
+    item.dataset.lat = String(lat);
+    item.dataset.lng = String(lng);
+    item.dataset.heading = String(Number(pov.heading || 0));
+    item.dataset.pitch = String(Number(pov.pitch || 0));
+
+    var img = item.querySelector('img[data-fullsrc]');
+    if (img) {
+      var thumb = _svThumbUrl_(lat, lng, pov.heading, pov.pitch).replace('size=800x400', 'size=280x120');
+      var full = _svThumbUrl_(lat, lng, pov.heading, pov.pitch);
+      img.src = thumb;
+      img.dataset.fullsrc = full;
+    }
+
+    cToast('Posição final aplicada ao candidato.', 'success');
+  }
+
+  if (_svAjusteCtx.mode === 'mlp' && _mlpItem) {
+    _mlpItem.lat = lat;
+    _mlpItem.lng = lng;
+
+    var img2 = document.getElementById('mlpStreetImg');
+    if (img2) {
+      img2.src = _svThumbUrl_(lat, lng, pov.heading, pov.pitch).replace('size=800x400', 'size=600x300');
+      img2.style.display = 'block';
+    }
+    var ph = document.getElementById('mlpStreetPlaceholder');
+    if (ph) ph.style.display = 'none';
+
+    var end = document.getElementById('mlpEndereco');
+    if (end) end.textContent = _fmtLatLng_(lat, lng);
+
+    cToast('Posição final aplicada ao local.', 'success');
+  }
+
+  _svAjusteFechar();
+}
+
+function _svAjusteFechar() {
+  var modal = document.getElementById('svAjusteModal');
+  if (modal) modal.style.display = 'none';
+  _svPanorama = null;
+  _svAjusteCtx = null;
+}
+
 function _vrrAdicionarItemLista(r) {
   var lista = document.getElementById('vrrLista');
   var cls = _vrrClassificarResultado(r);
@@ -10753,30 +11014,34 @@ function _vrrAdicionarItemLista(r) {
   var bgBadge = cls.bgBadge;
 
   var mapsKey = window._MAPS_KEY || window.MAPS_KEY || '';
-  var svUrl = mapsKey
-    ? 'https://maps.googleapis.com/maps/api/streetview?size=280x120&location=' + r.lat + ',' + r.lng + '&fov=90&pitch=0&key=' + mapsKey
-    : '';
+  var heading = Number(r.heading || 0);
+  var pitch = Number(r.pitch || 0);
 
-  var svThumb = svUrl
-    ? '<img src="' + svUrl + '" data-fullsrc="' + svUrl.replace('280x120', '800x400') + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
+  var svFull = mapsKey ? _svThumbUrl_(r.lat, r.lng, heading, pitch) : '';
+  var svThumb = svFull ? svFull.replace('size=800x400', 'size=280x120') : '';
+
+  var thumbHtml = svThumb
+    ? '<img src="' + svThumb + '" data-fullsrc="' + svFull + '" onclick="_vrrAbrirFoto(this)" title="Clique para ampliar" style="width:100%;height:90px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block;cursor:zoom-in" onerror="this.remove()">'
     : '';
 
   var obsCalcada = r.calcadaObs || '';
   if (obsCalcada === 'Coords invalidas' || obsCalcada === 'Erro GAS') obsCalcada = '';
-  if (obsCalcada === 'Lat/Lng invalidos.' || obsCalcada === 'Coordenadas invalidas para analise deste ponto.') {
-  obsCalcada = 'Ponto com coordenada invalida na analise.';
-}
-  if (obsCalcada === 'Sem Street View') obsCalcada = 'Sem imagem disponivel neste local';
-  if (!obsCalcada && !r.aptoFisico) obsCalcada = 'Reprovado fisicamente para implantacao.';
+  if (obsCalcada === 'Sem Street View') obsCalcada = 'Sem imagem disponível neste local';
+  if (!obsCalcada && !r.aptoFisico) obsCalcada = 'Reprovado fisicamente para implantação.';
 
   var itemId = 'vrr_' + Math.random().toString(36).substr(2, 8);
   var imgA = Number(r.imagensAnalisadas || 0);
   var imgP = Number(r.imagensPositivas || 0);
   var imgB = Number(r.imagensBloqueantes || 0);
 
-  var podeSelecionar = true;
-  var checkDisabled = '';
-  var checkTitle = '';
+  var div = document.createElement('div');
+  div.className = 'vrr-item';
+  div.dataset.score = r.score;
+  div.dataset.lat = String(Number(r.lat));
+  div.dataset.lng = String(Number(r.lng));
+  div.dataset.heading = String(heading);
+  div.dataset.pitch = String(pitch);
+  div.dataset.rank = String(cls.rank || 0);
 
   var svResumo = '';
   if (imgA > 0) {
@@ -10791,89 +11056,32 @@ function _vrrAdicionarItemLista(r) {
       '</div>';
   }
 
-  var ajusteHtml = '';
-  if (r.ajustadoIA) {
-    ajusteHtml =
-      '<div style="margin-top:6px;padding:7px 8px;border-radius:7px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.22)">' +
-        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
-          '<span style="font-size:9px;font-weight:800;letter-spacing:.06em;color:#93c5fd">AJUSTADO PELA IA</span>' +
-          '<span style="font-size:10px;color:white">' + (r.ajusteLabel || 'microajuste') + '</span>' +
-          '<span style="font-size:10px;color:rgba(255,255,255,.55)">(' + Number(r.ajusteDistM || 0) + 'm)</span>' +
-        '</div>' +
-        '<div style="margin-top:4px;font-size:10px;color:rgba(255,255,255,.58)">Original: '
-          + Number(r.latOriginal || r.lat).toFixed(5) + ', ' + Number(r.lngOriginal || r.lng).toFixed(5) +
-        '</div>' +
-      '</div>';
-  }
-
-  var badgeAjuste = r.ajustadoIA
-    ? '<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;background:rgba(59,130,246,.15);color:#93c5fd;letter-spacing:.05em">AJUSTADO</span>'
-    : '';
-
-  var corSelect = r.aptoFisico ? '#60a5fa' : '#fbbf24';
-  var bgSelect = r.aptoFisico ? 'rgba(37,99,235,.12)' : 'rgba(245,158,11,.10)';
-  var borderSelect = r.aptoFisico ? 'rgba(37,99,235,.25)' : 'rgba(245,158,11,.22)';
-  var txtSelect = r.aptoFisico ? 'Selecionar' : 'Selecionar mesmo assim';
-
-  var div = document.createElement('div');
-  div.className = 'vrr-item';
-  div.dataset.score = r.score;
-  div.dataset.lat = r.lat;
-  div.dataset.lng = r.lng;
-  div.dataset.latOriginal = r.latOriginal || r.lat;
-  div.dataset.lngOriginal = r.lngOriginal || r.lng;
-  div.dataset.aptoFisico = r.aptoFisico ? '1' : '0';
-  div.dataset.rank = String(cls.rank);
-  div.dataset.ajustadoIa = r.ajustadoIA ? '1' : '0';
-  div.dataset.ajusteLabel = r.ajusteLabel || '';
-  div.dataset.ajusteTipo = r.ajusteTipo || '';
-  div.dataset.ajusteDistM = String(r.ajusteDistM || 0);
-
   div.innerHTML =
-    svThumb +
+    thumbHtml +
     '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-      '<input type="checkbox" id="' + itemId + '" ' + checkDisabled + ' ' + checkTitle + ' style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">' +
+      '<input type="checkbox" id="' + itemId + '" style="width:14px;height:14px;accent-color:' + cor + ';cursor:pointer;flex-shrink:0" onchange="_vrrAtualizarLote()">' +
       '<div style="font-size:18px;font-weight:800;color:' + cor + '">' + r.score + '</div>' +
-      '<div style="margin-left:auto;display:flex;gap:4px;align-items:center">' +
-        badgeAjuste +
-        '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + '">' + badge + '</span>' +
-      '</div>' +
+      '<span class="vrr-badge" style="background:' + bgBadge + ';color:' + cor + ';margin-left:auto">' + badge + '</span>' +
     '</div>' +
 
     '<div class="vrr-score-bar" style="background:' + cor + ';width:' + Math.max(4, Math.min(100, r.score)) + '%"></div>' +
 
     '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">' +
-      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Cobertura: ' + r.scoreCobertura + '</span>' +
-      '<span style="font-size:9px;color:rgba(255,255,255,.35)">POI: ' + r.scorePOI + '</span>' +
-      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Calcada: ' + r.scoreCalcada + '</span>' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Cobertura: ' + Number(r.scoreCobertura || 0) + '</span>' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">POI: ' + Number(r.scorePOI || 0) + '</span>' +
+      '<span style="font-size:9px;color:rgba(255,255,255,.35)">Calçada: ' + Number(r.scoreCalcada || 0) + '</span>' +
       '<span style="font-size:9px;color:' + (r.aptoFisico ? '#10b981' : '#ef4444') + ';font-weight:700">' +
         (r.aptoFisico ? 'APTO FISICO' : 'REPROVADO FISICO') +
       '</span>' +
     '</div>' +
 
     '<div style="margin-top:6px;font-size:10px;color:rgba(255,255,255,.55)">Largura: ' + (r.calcadaLargura || 'indefinido') + '</div>' +
-
-    ajusteHtml +
     svResumo +
-
-    (obsCalcada
-      ? '<div style="margin-top:6px;font-size:10px;line-height:1.35;color:rgba(255,255,255,.58)">' + obsCalcada + '</div>'
-      : '') +
+    (obsCalcada ? '<div style="margin-top:6px;font-size:10px;line-height:1.35;color:rgba(255,255,255,.58)">' + obsCalcada + '</div>' : '') +
 
     '<div style="display:flex;gap:6px;margin-top:8px">' +
-      '<button type="button" onclick="_vrrAdicionarPonto(' + r.lat + ',' + r.lng + ')" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:white;font-size:11px;cursor:pointer">Abrir ponto</button>' +
-      '<button type="button" class="vrr-btn-select" ' +
-        (podeSelecionar
-          ? 'onclick="this.closest(\'.vrr-item\').querySelector(\'input[type=checkbox]\').click()" '
-          : 'disabled ') +
-        'style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid ' +
-        (podeSelecionar ? borderSelect : 'rgba(239,68,68,.18)') + ';background:' +
-        (podeSelecionar ? bgSelect : 'rgba(239,68,68,.08)') + ';color:' +
-        (podeSelecionar ? corSelect : '#fca5a5') + ';font-size:11px;cursor:' +
-        (podeSelecionar ? 'pointer' : 'not-allowed') + ';opacity:' +
-        (podeSelecionar ? '1' : '0.7') + '">' +
-        (podeSelecionar ? txtSelect : 'Bloqueado') +
-      '</button>' +
+      '<button type="button" onclick="_vrrAbrirStreetViewItem(this)" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(59,130,246,.25);background:rgba(59,130,246,.12);color:#60a5fa;font-size:11px;cursor:pointer">Street View</button>' +
+      '<button type="button" onclick="_vrrAbrirPontoItem(this)" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.06);color:white;font-size:11px;cursor:pointer">Abrir ponto</button>' +
     '</div>';
 
   lista.appendChild(div);
@@ -10975,59 +11183,68 @@ function _vrrConfirmarLote() {
   if (modal) modal.style.display = 'none';
   if (!_vrrSelecao.length) return;
 
-  var tipo   = (document.getElementById('vrrLoteTipo') || {}).value || 'PUBLICA';
-  var mod    = (document.getElementById('vrrLoteMod')  || {}).value || 'PATINETE';
-  var obs    = (document.getElementById('vrrLoteObs')  || {}).value || '';
-  var total  = _vrrSelecao.length;
-  var pontos = _vrrSelecao.slice(); // copia
+  var tipo  = (document.getElementById('vrrLoteTipo') || {}).value || 'PUBLICA';
+  var mod   = (document.getElementById('vrrLoteMod')  || {}).value || 'PATINETE';
+  var obs   = (document.getElementById('vrrLoteObs')  || {}).value || '';
+  var total = _vrrSelecao.length;
+
+  var pontos = _vrrSelecao.filter(function(p) {
+    return !_jaExisteMuitoProximo_(p.lat, p.lng, 30);
+  });
+
+  if (!pontos.length) {
+    cToast('Todos os pontos selecionados já possuem estação muito próxima.', 'warn');
+    return;
+  }
 
   if (!CS.user) {
-    // Tentar pegar user do localStorage
     var raw = localStorage.getItem('campoUser');
     if (raw) { try { CS.user = JSON.parse(raw); } catch(e) {} }
     if (!CS.user) {
-      cToast('Faca login antes de adicionar em lote', 'error');
+      cToast('Faça login antes de adicionar em lote', 'error');
       return;
     }
   }
 
-  console.log('[lote] iniciando save de', total, 'pontos. CS.user:', CS.user && CS.user.email);
-  cToast('Salvando ' + total + ' estacoes...', 'info');
-  var salvos = 0, erros = 0;
-  // Mostrar progresso no painel
+  cToast('Salvando ' + pontos.length + ' estações...', 'info');
+
+  var salvos = 0, erros = 0, pulados = total - pontos.length;
   var progEl = document.getElementById('vrrProgressoLabel');
   var pctEl  = document.getElementById('vrrProgressoPct');
   var progDiv = document.getElementById('vrrProgresso');
   if (progDiv) progDiv.style.display = 'block';
 
-  // Processar em serie para nao sobrecarregar o GAS
   function _salvarProximo(idx) {
     if (idx >= pontos.length) {
-      // Concluido -- zerar selecao agora
       _vrrSelecao = [];
       _vrrAtualizarLote();
       if (progDiv) progDiv.style.display = 'none';
-      var msg = salvos + ' estacoes salvas';
+
+      var msg = salvos + ' estações salvas';
+      if (pulados) msg += ', ' + pulados + ' duplicadas ignoradas';
       if (erros) msg += ', ' + erros + ' com erro';
-      console.log('[lote] concluido:', msg);
-      cToast(msg, salvos > 0 ? 'success' : 'error');
+
+      cToast(msg, salvos > 0 ? 'success' : 'warn');
       if (salvos > 0 && window._refreshMapa) window._refreshMapa();
       return;
     }
+
     var p = pontos[idx];
-    // Geocode reverso via GAS para obter endereco
+
     _gasRun('reverseGeocodePWA', { lat: p.lat, lng: p.lng },
       function(geoRes) {
         var geo = (geoRes && geoRes.ok && geoRes.geo) || {};
         var payload = {
           email: CS.user.email || '',
-          lat: p.lat, lng: p.lng,
+          lat: p.lat,
+          lng: p.lng,
           tipo: tipo,
           modalidade: mod,
           nomeConcorrente: '',
           observacoes: obs || 'Adicionado em lote via Varredura IA',
           status: 'SOLICITADO',
-          dimensoes: '', larguraFaixa: '',
+          dimensoes: '',
+          larguraFaixa: '',
           geo: {
             cidade:   geo.cidade   || '',
             bairro:   geo.bairro   || '',
@@ -11038,128 +11255,82 @@ function _vrrConfirmarLote() {
           origem: 'PWA_CAMPO_LOTE',
           foto: null
         };
+
         _gasRun('addEstacaoFromMapa', payload,
           function(res) {
             if (res && res.ok) {
               salvos++;
-              // Atualizar barra de progresso
-              var pct2 = Math.round(salvos / pontos.length * 100);
-              if (progEl) progEl.textContent = 'Salvando ' + salvos + '/' + pontos.length;
+
+              var pct2 = Math.round((idx + 1) / pontos.length * 100);
+              if (progEl) progEl.textContent = 'Salvando ' + (idx + 1) + '/' + pontos.length;
               if (pctEl) pctEl.textContent = pct2 + '%';
-              // Adicionar ao mapa local imediatamente
+
               window._vrrJaAdicionados = window._vrrJaAdicionados || [];
-              window._vrrJaAdicionados.push(p);
-              window._vrrAprovados = window._vrrAprovados || [];
-              window._vrrAprovados.push(p);
+              window._vrrJaAdicionados.push({ lat: p.lat, lng: p.lng });
+
               _vrrMarcarAprovado(p.lat, p.lng, tipo);
-              // Remover heat marker
-              _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
-                var pos = m.getPosition();
-                if (pos && Math.abs(pos.lat()-p.lat) < 0.0001 && Math.abs(pos.lng()-p.lng) < 0.0001) {
-                  m.setMap(null); return false;
-                }
-                return true;
-              });
-              // Adicionar ao array local de estacoes
-              if (window.estacoes && res.estacao) {
-                var est = res.estacao;
-                est.__id = est.codigo ? ('COD:' + est.codigo) : ('tmp-' + Date.now());
-                est.lat = est.lat || p.lat;
-                est.lng = est.lng || p.lng;
-                est.tipo = tipo;
-                est.modalidade = mod;
-                est.statusEstacao = 'SOLICITADO';
-                est.cidade = payload.geo.cidade;
-                est.bairro = payload.geo.bairro;
-                est.endereco = payload.geo.endereco;
-                if (window.estacoesPorCidade && est.cidade) {
-                  if (!window.estacoesPorCidade[est.cidade]) window.estacoesPorCidade[est.cidade] = [];
-                  window.estacoesPorCidade[est.cidade].push(est);
-                }
-                window.estacoes.push(est);
-                if (window._mapInvalidateCache) window._mapInvalidateCache();
-              }
-              // Marcar item da lista como salvo
+
               document.querySelectorAll('.vrr-item').forEach(function(item) {
-                if (Math.abs(Number(item.dataset.lat)-p.lat) < 0.0001 && Math.abs(Number(item.dataset.lng)-p.lng) < 0.0001) {
+                if (Math.abs(Number(item.dataset.lat) - p.lat) < 0.0001 && Math.abs(Number(item.dataset.lng) - p.lng) < 0.0001) {
                   item.style.background = 'rgba(16,185,129,.12)';
                   item.style.border = '1px solid rgba(16,185,129,.3)';
                   item.style.borderRadius = '8px';
-                  var btnAdd = item.querySelector('button[onclick*="_vrrAdicionarPonto"]');
-                  if (btnAdd) { btnAdd.disabled = true; btnAdd.textContent = 'Salvo'; btnAdd.style.opacity = '0.5'; }
                 }
               });
             } else {
               erros++;
-              console.warn('[lote] erro ponto', p.lat, p.lng, res && res.error);
             }
-            // Proximo com pequeno delay
-            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 250);
           },
-          function(e) {
+          function() {
             erros++;
-            console.warn('[lote] GAS erro', e);
-            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
+            setTimeout(function(){ _salvarProximo(idx + 1); }, 250);
           }
         );
       },
       function() {
-        // Geocode falhou -- salvar mesmo assim sem endereco (nao e erro critico)
-        console.warn('[lote] geocode falhou para', p.lat, p.lng, '-- salvando sem endereco');
-        var payloadSemGeo = {
-          email: CS.user.email || '',
-          lat: p.lat, lng: p.lng,
-          tipo: tipo, modalidade: mod,
-          nomeConcorrente: '',
-          observacoes: obs || 'Adicionado em lote via Varredura IA',
-          status: 'SOLICITADO',
-          dimensoes: '', larguraFaixa: '',
-          geo: { cidade: '', bairro: '', endereco: '', pais: 'BR' },
-          operador: CS.user.email, origem: 'PWA_CAMPO_LOTE', foto: null
-        };
-        _gasRun('addEstacaoFromMapa', payloadSemGeo,
-          function(res) {
-            if (res && res.ok) {
-              salvos++;
-              _vrrMarcarAprovado(p.lat, p.lng, tipo);
-              window._vrrJaAdicionados = window._vrrJaAdicionados || [];
-              window._vrrJaAdicionados.push(p);
-            } else {
-              erros++;
-              console.warn('[lote] GAS erro sem geo:', res && res.error);
-            }
-            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
-          },
-          function(e) {
-            erros++;
-            setTimeout(function(){ _salvarProximo(idx + 1); }, 400);
-          }
-        );
+        erros++;
+        setTimeout(function(){ _salvarProximo(idx + 1); }, 250);
       }
     );
   }
 
-  // Nao zerar selecao aqui -- zerar quando todos terminarem
   _salvarProximo(0);
 }
 
+
 function _vrrAdicionarPonto(lat, lng) {
-  // Registrar como aprovado -- exibe pin estrela e nao repete em proxima varredura
+  lat = Number(lat);
+  lng = Number(lng);
+
+  if (!isFinite(lat) || !isFinite(lng)) {
+    cToast('Coordenadas inválidas.', 'error');
+    return;
+  }
+
+  if (_jaExisteMuitoProximo_(lat, lng, 30)) {
+    cToast('Já existe estação muito próxima desse ponto.', 'warn');
+    return;
+  }
+
   window._vrrJaAdicionados = window._vrrJaAdicionados || [];
   window._vrrJaAdicionados.push({ lat: lat, lng: lng });
+
   window._vrrAprovados = window._vrrAprovados || [];
   window._vrrAprovados.push({ lat: lat, lng: lng });
+
   _vrrMarcarAprovado(lat, lng);
-  // Remover heat marker do ponto aprovado (pin estrela substitui)
+
   _vrrHeatMarkers = _vrrHeatMarkers.filter(function(m) {
     var pos = m.getPosition();
-    if (pos && Math.abs(pos.lat()-lat) < 0.0001 && Math.abs(pos.lng()-lng) < 0.0001) {
+    if (pos && Math.abs(pos.lat() - lat) < 0.0001 && Math.abs(pos.lng() - lng) < 0.0001) {
       m.setMap(null);
       return false;
     }
     return true;
   });
-  // Marcar item da lista como aprovado (fundo verde suave)
+
   document.querySelectorAll('.vrr-item').forEach(function(item) {
     var ilat = Number(item.dataset.lat);
     var ilng = Number(item.dataset.lng);
@@ -11167,61 +11338,21 @@ function _vrrAdicionarPonto(lat, lng) {
       item.style.background = 'rgba(16,185,129,.12)';
       item.style.border = '1px solid rgba(16,185,129,.3)';
       item.style.borderRadius = '8px';
-      // Desabilitar botao Add para nao duplicar
-      var btnAdd = item.querySelector('button[onclick*="_vrrAdicionarPonto"]');
-      if (btnAdd) { btnAdd.disabled = true; btnAdd.textContent = 'Adicionado'; btnAdd.style.opacity = '0.5'; }
     }
   });
+
   fecharVarredura();
+
   var latLng = new google.maps.LatLng(lat, lng);
-  cOpenDrawer();
+  if (typeof cOpenDrawer === 'function') cOpenDrawer();
+  if (typeof cPlacePin === 'function') cPlacePin(lat, lng);
+
   setTimeout(function() {
-    cPlacePin(latLng);
-    _mlpGeocodedAddr = null;
-    _mlpGeocodeReverso_(lat, lng);
-
-    // Pre-carregar Street View no preview de foto do drawer
-    var mapsKey = window._MAPS_KEY || '';
-    if (mapsKey) {
-      var pp = document.getElementById('cPhotoPreview');
-      var pa = document.getElementById('cPhotoArea');
-      if (pp && pa) {
-        var svUrl = 'https://maps.googleapis.com/maps/api/streetview?size=600x300'
-          + '&location=' + lat + ',' + lng
-          + '&fov=90&pitch=0&key=' + mapsKey;
-        pp.src = svUrl;
-        pp.onload = function() {
-          pp.classList.add('visible');
-          pa.classList.add('has-photo');
-          // Marcar como preview SV (nao e foto real -- usuario deve fotografar o local)
-          pp.title = 'Imagem Street View -- tire uma foto real no local';
-          CS.photoDataUrl = null; // nao e foto real, nao envia ao salvar
-        };
-        pp.onerror = function() {
-          pp.classList.remove('visible');
-          pa.classList.remove('has-photo');
-        };
-      }
-    }
-
-    setTimeout(function() {
-      var elLat = document.getElementById('addLat');
-      var elLng = document.getElementById('addLng');
-      if (elLat) elLat.value = lat.toFixed(7);
-      if (elLng) elLng.value = lng.toFixed(7);
-      if (_mlpGeocodedAddr) {
-        var elEnd    = document.getElementById('addEndereco');
-        var elBairro = document.getElementById('addBairro');
-        var elCid    = document.getElementById('addCidade');
-        if (elEnd && _mlpGeocodedAddr.endereco) elEnd.value = _mlpGeocodedAddr.endereco;
-        if (elBairro && _mlpGeocodedAddr.bairro) elBairro.value = _mlpGeocodedAddr.bairro;
-        if (elCid && _mlpGeocodedAddr.cidade) {
-          elCid.value = _mlpGeocodedAddr.cidade;
-          elCid.dispatchEvent(new Event('change'));
-        }
-      }
-    }, 800);
-  }, 80);
+    var elLat = document.getElementById('addLat');
+    var elLng = document.getElementById('addLng');
+    if (elLat) elLat.value = lat.toFixed(7);
+    if (elLng) elLng.value = lng.toFixed(7);
+  }, 120);
 }
 
 function vrrAdicionarAprovados() {
@@ -11537,54 +11668,32 @@ function fecharModalLocal() {
 
 function mlpAdicionarDireto() {
   if (!_mlpItem) return;
-  var item = _mlpItem;
-  var addr = _mlpGeocodedAddr;
+
+  var lat = Number(_mlpItem.lat);
+  var lng = Number(_mlpItem.lng);
+
+  if (!isFinite(lat) || !isFinite(lng)) {
+    cToast('Coordenadas inválidas.', 'error');
+    return;
+  }
+
+  if (_jaExisteMuitoProximo_(lat, lng, 30)) {
+    cToast('Já existe estação muito próxima desse ponto.', 'warn');
+    return;
+  }
+
   fecharModalLocal();
 
-  var latLng = new google.maps.LatLng(item.lat, item.lng);
-  cOpenDrawer();
-
   setTimeout(function() {
-    // Colocar pin nas coordenadas do local
-    cPlacePin(latLng);
+    if (typeof cOpenDrawer === 'function') cOpenDrawer();
+    if (typeof cPlacePin === 'function') cPlacePin(lat, lng);
 
-    // Pre-preencher formulario apos o drawer abrir
     setTimeout(function() {
-      // Lat/Lng
       var elLat = document.getElementById('addLat');
       var elLng = document.getElementById('addLng');
-      if (elLat) elLat.value = item.lat.toFixed(7);
-      if (elLng) elLng.value = item.lng.toFixed(7);
-
-      if (addr) {
-        // Endereco
-        var elEnd = document.getElementById('addEndereco');
-        if (elEnd && addr.endereco) elEnd.value = addr.endereco;
-
-        // Bairro
-        var elBairro = document.getElementById('addBairro');
-        if (elBairro && addr.bairro) elBairro.value = addr.bairro;
-
-        // Cidade
-        var elCid = document.getElementById('addCidade');
-        if (elCid && addr.cidade) {
-          elCid.value = addr.cidade;
-          // Disparar evento de change para atualizar dropdowns dependentes
-          elCid.dispatchEvent(new Event('change'));
-        }
-
-        // Nome local como observacao
-        var elObs = document.getElementById('addObs');
-        if (elObs && item.nome) {
-          elObs.value = (elObs.value ? elObs.value + '\n' : '') + 'Proximo a: ' + item.nome;
-        }
-      }
-
-      // Toast de confirmacao
-      if (typeof cToast === 'function') {
-        cToast('Formulario pre-preenchido com dados do local', 'success');
-      }
-    }, 300);
+      if (elLat) elLat.value = lat.toFixed(7);
+      if (elLng) elLng.value = lng.toFixed(7);
+    }, 120);
   }, 80);
 }
 
