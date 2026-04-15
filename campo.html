@@ -1140,7 +1140,7 @@ textarea.cp-input{resize:none;min-height:60px;line-height:1.5}
   transform: translateX(0);
 }
 #fabDialItems.open {
-  max-height: 400px !important;
+  max-height: 520px !important;
   opacity: 1 !important;
   pointer-events: auto !important;
 }
@@ -2378,8 +2378,8 @@ input:focus, select:focus {
 
 
 <!-- MODAL EXCLUSÃO EM MASSA -->
-<div id="modalExclusaoMassa" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
-  <div style="background:#0c1423;border:1px solid rgba(220,38,38,.3);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.8)">
+<div id="modalExclusaoMassa" style="display:none;position:fixed;inset:0;z-index:9800;pointer-events:none;padding:20px;align-items:flex-start;justify-content:flex-end">
+  <div style="pointer-events:auto;background:#0c1423;border:1px solid rgba(220,38,38,.3);border-radius:16px;padding:20px;width:100%;max-width:360px;max-height:75vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.8);margin-top:60px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
       <div>
         <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#f87171;margin-bottom:2px">EXCLUSÃO EM MASSA</div>
@@ -13426,7 +13426,7 @@ function _emMassaAtualizarLista(lista) {
   var instrucao = document.getElementById('emMassaInstrucao');
 
   if (titulo) {
-    titulo.textContent = lista.length + ' estação' + (lista.length !== 1 ? 'ões' : '') + ' selecionada' + (lista.length !== 1 ? 's' : '');
+    titulo.textContent = lista.length + (lista.length === 1 ? ' estação selecionada' : ' estações selecionadas');
   }
 
   if (instrucao) {
@@ -13464,7 +13464,7 @@ function _emMassaAtualizarLista(lista) {
     btnExcluir.style.opacity = lista.length > 0 ? '1' : '0.4';
     btnExcluir.style.cursor = lista.length > 0 ? 'pointer' : 'default';
     if (lista.length > 0) {
-      btnExcluir.textContent = 'Excluir ' + lista.length + ' estação' + (lista.length !== 1 ? 'ões' : '');
+      btnExcluir.textContent = 'Excluir ' + lista.length + (lista.length === 1 ? ' estação' : ' estações');
     } else {
       btnExcluir.textContent = 'Excluir selecionadas';
     }
@@ -13475,7 +13475,7 @@ function cConfirmarExclusaoEmMassa() {
   if (!_emMassaSelecionadas || !_emMassaSelecionadas.length) return;
 
   var n = _emMassaSelecionadas.length;
-  var confirmMsg = 'Confirma a exclusão de ' + n + ' estação' + (n !== 1 ? 'ões' : '') + '?\n\nEssa ação não pode ser desfeita.';
+  var confirmMsg = 'Confirma a exclusão de ' + n + (n === 1 ? ' estação' : ' estações') + '?\n\nEssa ação não pode ser desfeita.';
   if (!window.confirm(confirmMsg)) return;
 
   var btn = document.getElementById('emMassaBtnExcluir');
@@ -13493,12 +13493,12 @@ function cConfirmarExclusaoEmMassa() {
     function(res) {
       if (!res || !res.ok) {
         cToast((res && res.error) ? res.error : 'Erro ao excluir em massa.', 'error');
-        if (btn) { btn.disabled = false; btn.textContent = 'Excluir ' + n + ' estação' + (n !== 1 ? 'ões' : ''); btn.style.opacity = '1'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Excluir ' + n + (n === 1 ? ' estação' : ' estações'); btn.style.opacity = '1'; }
         return;
       }
 
       var excluidos = res.excluidos || codigos.length;
-      cToast(excluidos + ' estação' + (excluidos !== 1 ? 'ões excluídas' : ' excluída') + '!', 'success');
+      cToast(excluidos + (excluidos === 1 ? ' estação excluída' : ' estações excluídas') + '!', 'success');
 
       // Remove do array local e re-renderiza
       codigos.forEach(function(cod) {
