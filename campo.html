@@ -11888,7 +11888,7 @@ function _locMontarQueryOverpass_(lat, lng, raioMetros) {
     });
   });
 
-  return '[out:json][timeout:20];(' + parts.join('') + ');out center qt;';
+  return '[out:json][timeout:18];(' + parts.join('') + ');out center qt;';
 }
 
 function buscarLocaisPrioritarios(lat, lng, raioMetros) {
@@ -11911,8 +11911,8 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   var servidores = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+    'https://overpass.openstreetmap.ru/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
   ];
 
   function fetchOverpass(url, timeoutMs) {
@@ -11951,7 +11951,7 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
       lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:8px">Tentando servidor ' + (idx + 1) + ' de ' + servidores.length + '...</div>';
     }
 
-    fetchOverpass(servidores[idx], 15000)
+    fetchOverpass(servidores[idx], 20000)
       .then(function(data) {
         _processarResultadosLocais_((data && data.elements) || [], lat, lng);
       })
