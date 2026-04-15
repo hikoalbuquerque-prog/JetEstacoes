@@ -7052,7 +7052,56 @@ function cReverseGeocodePin(lat, lng) {
 function cBuscarEnderecoPainel() {
   var q = (document.getElementById('cPanelBusca').value || '').trim();
   if (!q) return;
-  cToast('Busca manual por endereço ainda não configurada no backend.', 'warn');
+
+  if (!window.google || !google.maps || !google.maps.Geocoder) {
+    cToast('Busca por endereço indisponível', 'warn');
+    return;
+  }
+
+  var geocoder = new google.maps.Geocoder();
+
+  geocoder.geocode({ address: q, region: 'BR' }, function(results, status) {
+    if (status !== 'OK' || !results || !results.length) {
+      cToast('Endereço não encontrado', 'error');
+      return;
+    }
+
+    var r = results[0];
+    var loc = r.geometry && r.geometry.location;
+    if (!loc) {
+      cToast('Endereço não encontrado', 'error');
+      return;
+    }
+
+    var lat = loc.lat();
+    var lng = loc.lng();
+
+    var comps = r.address_components || [];
+    function findType(type) {
+      var hit = comps.find(function(c){ return (c.types || []).indexOf(type) >= 0; });
+      return hit ? hit.long_name : '';
+    }
+
+    var geo = {
+      endereco: r.formatted_address || q,
+      bairro: findType('sublocality') || findType('sublocality_level_1') || findType('neighborhood'),
+      cidade: findType('administrative_area_level_2') || findType('locality'),
+      pais: findType('country') || 'BR'
+    };
+
+    _rgCache.set(_rgKey_(lat, lng), geo);
+
+    var ll = new google.maps.LatLng(lat, lng);
+    cPlacePin(ll);
+
+    var gm = window._gmap;
+    if (gm) {
+      gm.panTo(ll);
+      gm.setZoom(Math.max(gm.getZoom() || 0, 17));
+    }
+
+    _setDrawerGeoUI_(geo, lat, lng, 'Endereço não encontrado');
+  });
 }
 
 /* ---- CHECK PROXIMIDADE ---- */
@@ -11870,6 +11919,31 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   function fetchOverpass(url) {
     var controller = new AbortController();
     var to = setTimeout(function(){ controller.abort(); }, 12000);
+function buscarLocaisPrioritarios(lat, lng, raioMetros) {
+  raioMetros = Number(raioMetros || 700);
+  _locaisResultados = {};
+  _locaisMarkers.forEach(function(m){ m.setMap(null); });
+  _locaisMarkers = [];
+
+  var painel = document.getElementById('painelLocaisPri');
+  var lista  = document.getElementById('painelLocaisLista');
+  var contEl = document.getElementById('painelLocaisContador');
+  if (!painel || !lista) return;
+
+  lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:8px">Buscando POIs...</div>';
+  if (contEl) contEl.textContent = '';
+  painel.style.display = 'flex';
+
+  var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
+
+  var servidores = [
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
+  ];
+
+  function fetchOverpass(url) {
+    var controller = new AbortController();
+    var to = setTimeout(function(){ controller.abort(); }, 12000);
 
     return fetch(url, {
       method: 'POST',
@@ -11889,9 +11963,7 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
     });
   }
 
-  function tentarServidor(idx, erros) {
-    erros = erros || [];
-
+  function tentarServidor(idx) {
     if (idx >= servidores.length) {
       lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Serviço indisponível</div>';
       if (contEl) contEl.textContent = '';
@@ -11904,12 +11976,11 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
       })
       .catch(function(err) {
         console.warn('[Locais] falha em', servidores[idx], err);
-        erros.push(err && err.message ? err.message : 'erro');
-        tentarServidor(idx + 1, erros);
+        tentarServidor(idx + 1);
       });
   }
 
-  tentarServidor(0, []);
+  tentarServidor(0);
 }
 
 function _processarResultadosLocais_(elements, centerLat, centerLng) {
@@ -12222,6 +12293,7 @@ function _mlpStreetPreviewUrl_(lat, lng) {
     + '&pitch=0'
     + '&source=outdoor'
     + '&key=' + key;
+}    + '&key=' + key;
 }
 
 function _mlpGeocodeReverso_(lat, lng) {
