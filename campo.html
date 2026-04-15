@@ -13459,13 +13459,34 @@ function _emMassaIniciarDesenho(gmap) {
 }
 
 function _emMassaFiltrarEstacoes(bounds) {
-  if (!window.estacoes || !bounds) return [];
-  return window.estacoes.filter(function(e) {
-    var lat = typeof e.lat === 'number' ? e.lat : parseFloat(String(e.lat || '').replace(',', '.'));
-    var lng = typeof e.lng === 'number' ? e.lng : parseFloat(String(e.lng || '').replace(',', '.'));
+  if (!window.estacoes || !bounds) {
+    console.warn('[emMassa] estacoes:', window.estacoes ? window.estacoes.length : 'null', '| bounds:', bounds);
+    return [];
+  }
+
+  var ne = bounds.getNorthEast();
+  var sw = bounds.getSouthWest();
+  console.log('[emMassa] bounds NE:', ne.lat(), ne.lng(), '| SW:', sw.lat(), sw.lng());
+  console.log('[emMassa] total estacoes:', window.estacoes.length);
+
+  if (window.estacoes.length > 0) {
+    var amostra = window.estacoes[0];
+    console.log('[emMassa] amostra[0]:', JSON.stringify({ lat: amostra.lat, lng: amostra.lng, latitude: amostra.latitude, longitude: amostra.longitude }));
+  }
+
+  var resultado = window.estacoes.filter(function(e) {
+    var lat = typeof e.lat === 'number' ? e.lat
+            : typeof e.latitude === 'number' ? e.latitude
+            : parseFloat(String(e.lat || e.latitude || '').replace(',', '.'));
+    var lng = typeof e.lng === 'number' ? e.lng
+            : typeof e.longitude === 'number' ? e.longitude
+            : parseFloat(String(e.lng || e.longitude || '').replace(',', '.'));
     if (!isFinite(lat) || !isFinite(lng)) return false;
     return bounds.contains(new google.maps.LatLng(lat, lng));
   });
+
+  console.log('[emMassa] dentro do bounds:', resultado.length);
+  return resultado;
 }
 
 function _emMassaAtualizarLista(lista) {
