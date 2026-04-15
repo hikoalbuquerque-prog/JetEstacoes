@@ -2105,6 +2105,12 @@ input:focus, select:focus {
           <svg viewBox="0 0 24 24" style="fill:#60a5fa"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
         </button>
       </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="fab-dial-label">Excluir em Massa</span>
+        <button onclick="cIniciarExclusaoEmMassa();cFecharSpeedDial()" title="Excluir em Massa" class="map-fab-ctrl" id="fabExclusaoMassa" style="background:linear-gradient(135deg,rgba(220,38,38,.25),rgba(220,38,38,.1));border-color:rgba(220,38,38,.35)">
+          <svg viewBox="0 0 24 24" style="fill:#f87171"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+        </button>
+      </div>
     </div>
     <button id="fabDialToggle" onclick="cToggleSpeedDial()" class="map-fab-ctrl" title="Controles" style="background:rgba(13,18,30,.95);border-color:rgba(255,255,255,.2)">
       <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:rgba(255,255,255,.8)"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
@@ -2370,6 +2376,35 @@ input:focus, select:focus {
 <!-- TOAST -->
 
 
+
+<!-- MODAL EXCLUSÃO EM MASSA -->
+<div id="modalExclusaoMassa" style="display:none;position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px">
+  <div style="background:#0c1423;border:1px solid rgba(220,38,38,.3);border-radius:16px;padding:20px;width:100%;max-width:420px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.8)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-shrink:0">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#f87171;margin-bottom:2px">EXCLUSÃO EM MASSA</div>
+        <div id="emMassaTitle" style="font-size:14px;font-weight:700;color:#fff">0 estações selecionadas</div>
+      </div>
+      <button onclick="cCancelarExclusaoEmMassa()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:rgba(255,255,255,.5);width:30px;height:30px;cursor:pointer;font-size:15px">×</button>
+    </div>
+
+    <!-- Instrução / estado -->
+    <div id="emMassaInstrucao" style="font-size:11px;color:rgba(255,255,255,.45);background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px;margin-bottom:12px;flex-shrink:0;line-height:1.5">
+      Arraste no mapa para desenhar a área de seleção.<br>As estações dentro do retângulo serão listadas aqui.
+    </div>
+
+    <!-- Lista de estações selecionadas -->
+    <div id="emMassaLista" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px;margin-bottom:12px"></div>
+
+    <!-- Botões -->
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <button onclick="cCancelarExclusaoEmMassa()" style="flex:1;padding:11px;border-radius:9px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+      <button id="emMassaBtnExcluir" onclick="cConfirmarExclusaoEmMassa()" disabled style="flex:2;padding:11px;border-radius:9px;background:rgba(220,38,38,.15);border:1px solid rgba(220,38,38,.4);color:#f87171;font-size:13px;font-weight:700;cursor:pointer;opacity:.4;transition:opacity .2s">
+        Excluir selecionadas
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL ANALISE LOCAL PRIORITARIO -->
 <div id="modalLocalPri" style="display:none;position:fixed;z-index:9500;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)">
@@ -13285,6 +13320,231 @@ document.querySelectorAll('.flt-toggle').forEach(function(lbl) {
 .draw-item:hover{border-color:#334155;background:#1e293b}
 .draw-item.draw-item-sel{border-color:#7c3aed;background:#1e1b4b}
 </style>
+
+<script>
+/* =====================================================
+   EXCLUSÃO EM MASSA — seleção por retângulo no mapa
+   ===================================================== */
+
+var _emMassaAtivo      = false;
+var _emMassaRetangulo  = null;
+var _emMassaSelecionadas = [];
+var _emMassaListeners  = [];
+
+function cIniciarExclusaoEmMassa() {
+  if (!CS.user || !CS.user.email) {
+    cToast('Faça login para usar essa função.', 'warn');
+    return;
+  }
+
+  var gmap = window._gmap;
+  if (!gmap) { cToast('Mapa não carregado.', 'warn'); return; }
+
+  _emMassaAtivo = true;
+  _emMassaSelecionadas = [];
+  _emMassaRetangulo = null;
+
+  // Abre modal
+  var modal = document.getElementById('modalExclusaoMassa');
+  if (modal) modal.style.display = 'flex';
+
+  _emMassaAtualizarLista([]);
+  _emMassaIniciarDesenho(gmap);
+}
+
+function _emMassaIniciarDesenho(gmap) {
+  // Limpa retângulo anterior
+  if (_emMassaRetangulo) {
+    _emMassaRetangulo.setMap(null);
+    _emMassaRetangulo = null;
+  }
+
+  // Remove listeners anteriores
+  _emMassaListeners.forEach(function(l) {
+    google.maps.event.removeListener(l);
+  });
+  _emMassaListeners = [];
+
+  // Usa DrawingManager já existente (biblioteca drawing já carregada)
+  var dm = new google.maps.drawing.DrawingManager({
+    drawingMode: google.maps.drawing.OverlayType.RECTANGLE,
+    drawingControl: false,
+    rectangleOptions: {
+      fillColor: '#ef4444',
+      fillOpacity: 0.12,
+      strokeColor: '#ef4444',
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      clickable: false,
+      editable: true,
+      zIndex: 9000
+    }
+  });
+
+  dm.setMap(gmap);
+
+  var l = google.maps.event.addListener(dm, 'rectanglecomplete', function(rect) {
+    dm.setDrawingMode(null);
+    dm.setMap(null);
+
+    _emMassaRetangulo = rect;
+
+    // Calcula estações dentro do retângulo
+    var bounds = rect.getBounds();
+    var dentro = _emMassaFiltrarEstacoes(bounds);
+    _emMassaSelecionadas = dentro;
+    _emMassaAtualizarLista(dentro);
+
+    // Listener: atualiza ao redimensionar o retângulo
+    var l2 = google.maps.event.addListener(rect, 'bounds_changed', function() {
+      var b = rect.getBounds();
+      var d = _emMassaFiltrarEstacoes(b);
+      _emMassaSelecionadas = d;
+      _emMassaAtualizarLista(d);
+    });
+    _emMassaListeners.push(l2);
+  });
+
+  _emMassaListeners.push(l);
+  window._emMassaDM = dm;
+}
+
+function _emMassaFiltrarEstacoes(bounds) {
+  if (!window.estacoes || !bounds) return [];
+  return window.estacoes.filter(function(e) {
+    var lat = Number(e.lat);
+    var lng = Number(e.lng);
+    if (!isFinite(lat) || !isFinite(lng)) return false;
+    return bounds.contains(new google.maps.LatLng(lat, lng));
+  });
+}
+
+function _emMassaAtualizarLista(lista) {
+  var titulo = document.getElementById('emMassaTitle');
+  var listaEl = document.getElementById('emMassaLista');
+  var btnExcluir = document.getElementById('emMassaBtnExcluir');
+  var instrucao = document.getElementById('emMassaInstrucao');
+
+  if (titulo) {
+    titulo.textContent = lista.length + ' estação' + (lista.length !== 1 ? 'ões' : '') + ' selecionada' + (lista.length !== 1 ? 's' : '');
+  }
+
+  if (instrucao) {
+    if (lista.length === 0 && _emMassaRetangulo) {
+      instrucao.textContent = 'Nenhuma estação dentro da área. Redimensione o retângulo.';
+    } else if (!_emMassaRetangulo) {
+      instrucao.innerHTML = 'Arraste no mapa para desenhar a área de seleção.<br>As estações dentro do retângulo serão listadas aqui.';
+    } else {
+      instrucao.innerHTML = 'Arraste os cantos do retângulo para ajustar a seleção.';
+    }
+  }
+
+  if (listaEl) {
+    if (!lista.length) {
+      listaEl.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.3);text-align:center;padding:12px">Nenhuma estação selecionada</div>';
+    } else {
+      listaEl.innerHTML = lista.map(function(e) {
+        var cor = e.tipo === 'CONCORRENTE' ? '#60a5fa'
+                : (e.statusEstacao || '').toUpperCase() === 'ATIVO' ? '#22c55e'
+                : (e.statusEstacao || '').toUpperCase() === 'SOLICITADO' ? '#f59e0b'
+                : '#ef4444';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.15);border-radius:8px">'
+          + '<div style="width:8px;height:8px;border-radius:50%;background:' + cor + ';flex-shrink:0"></div>'
+          + '<div style="min-width:0;flex:1">'
+          +   '<div style="font-size:12px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (e.endereco || e.codigo || 'Sem endereço') + '</div>'
+          +   '<div style="font-size:10px;color:rgba(255,255,255,.4)">' + (e.tipo || '') + (e.bairro ? ' · ' + e.bairro : '') + '</div>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }
+  }
+
+  if (btnExcluir) {
+    btnExcluir.disabled = lista.length === 0;
+    btnExcluir.style.opacity = lista.length > 0 ? '1' : '0.4';
+    btnExcluir.style.cursor = lista.length > 0 ? 'pointer' : 'default';
+    if (lista.length > 0) {
+      btnExcluir.textContent = 'Excluir ' + lista.length + ' estação' + (lista.length !== 1 ? 'ões' : '');
+    } else {
+      btnExcluir.textContent = 'Excluir selecionadas';
+    }
+  }
+}
+
+function cConfirmarExclusaoEmMassa() {
+  if (!_emMassaSelecionadas || !_emMassaSelecionadas.length) return;
+
+  var n = _emMassaSelecionadas.length;
+  var confirmMsg = 'Confirma a exclusão de ' + n + ' estação' + (n !== 1 ? 'ões' : '') + '?\n\nEssa ação não pode ser desfeita.';
+  if (!window.confirm(confirmMsg)) return;
+
+  var btn = document.getElementById('emMassaBtnExcluir');
+  if (btn) { btn.disabled = true; btn.textContent = 'Excluindo...'; btn.style.opacity = '0.6'; }
+
+  var codigos = _emMassaSelecionadas.map(function(e) { return e.codigo; }).filter(Boolean);
+
+  if (!codigos.length) {
+    cToast('Nenhuma estação com código válido para excluir.', 'warn');
+    _emMassaFecharTudo();
+    return;
+  }
+
+  _gasRun('excluirEstacoesEmMassa', { codigos: codigos, email: CS.user && CS.user.email },
+    function(res) {
+      if (!res || !res.ok) {
+        cToast((res && res.error) ? res.error : 'Erro ao excluir em massa.', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'Excluir ' + n + ' estação' + (n !== 1 ? 'ões' : ''); btn.style.opacity = '1'; }
+        return;
+      }
+
+      var excluidos = res.excluidos || codigos.length;
+      cToast(excluidos + ' estação' + (excluidos !== 1 ? 'ões excluídas' : ' excluída') + '!', 'success');
+
+      // Remove do array local e re-renderiza
+      codigos.forEach(function(cod) {
+        if (window._removerEstacao) window._removerEstacao(cod);
+      });
+
+      _emMassaFecharTudo();
+    },
+    function(err) {
+      cToast('Erro: ' + String(err), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = 'Excluir ' + n + ' estação' + (n !== 1 ? 'ões' : ''); btn.style.opacity = '1'; }
+    }
+  );
+}
+
+function cCancelarExclusaoEmMassa() {
+  _emMassaFecharTudo();
+}
+
+function _emMassaFecharTudo() {
+  _emMassaAtivo = false;
+  _emMassaSelecionadas = [];
+
+  // Remove retângulo do mapa
+  if (_emMassaRetangulo) {
+    _emMassaRetangulo.setMap(null);
+    _emMassaRetangulo = null;
+  }
+
+  // Remove DrawingManager se ainda ativo
+  if (window._emMassaDM) {
+    try { window._emMassaDM.setMap(null); } catch(e) {}
+    window._emMassaDM = null;
+  }
+
+  // Remove listeners
+  _emMassaListeners.forEach(function(l) {
+    try { google.maps.event.removeListener(l); } catch(e) {}
+  });
+  _emMassaListeners = [];
+
+  // Fecha modal
+  var modal = document.getElementById('modalExclusaoMassa');
+  if (modal) modal.style.display = 'none';
+}
+</script>
 
 </body>
 </html>
