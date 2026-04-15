@@ -13359,61 +13359,110 @@ function _emMassaIniciarDesenho(gmap) {
     _emMassaRetangulo = null;
   }
 
-  // Remove listeners anteriores
   _emMassaListeners.forEach(function(l) {
-    google.maps.event.removeListener(l);
+    try { google.maps.event.removeListener(l); } catch(e) {}
   });
   _emMassaListeners = [];
 
-  // Usa DrawingManager já existente (biblioteca drawing já carregada)
-  var dm = new google.maps.drawing.DrawingManager({
-    drawingMode: google.maps.drawing.OverlayType.RECTANGLE,
-    drawingControl: false,
-    rectangleOptions: {
+  var mapDiv = document.getElementById('map');
+  if (!mapDiv) return;
+
+  // Desativa dragging do mapa durante o desenho
+  gmap.setOptions({ draggable: false, gestureHandling: 'none' });
+  var mapDiv = document.getElementById('map');
+  if (mapDiv) mapDiv.style.cursor = 'crosshair';
+
+  var startLatLng = null;
+  var rect = null;
+  var drawing = false;
+
+  function latLngFromPixel(x, y) {
+    var proj = gmap.getProjection();
+    var bounds = gmap.getBounds();
+    var ne = bounds.getNorthEast();
+    var sw = bounds.getSouthWest();
+    var rect_ = mapDiv.getBoundingClientRect();
+    var lng = sw.lng() + (x - rect_.left) / rect_.width * (ne.lng() - sw.lng());
+    var lat = ne.lat() - (y - rect_.top) / rect_.height * (ne.lat() - sw.lat());
+    return new google.maps.LatLng(lat, lng);
+  }
+
+  function onMouseDown(e) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    drawing = true;
+    startLatLng = latLngFromPixel(e.clientX, e.clientY);
+
+    if (rect) { rect.setMap(null); rect = null; }
+
+    rect = new google.maps.Rectangle({
+      map: gmap,
+      bounds: new google.maps.LatLngBounds(startLatLng, startLatLng),
       fillColor: '#ef4444',
       fillOpacity: 0.12,
       strokeColor: '#ef4444',
-      strokeOpacity: 0.8,
+      strokeOpacity: 0.85,
       strokeWeight: 2,
       clickable: false,
-      editable: true,
       zIndex: 9000
-    }
-  });
+    });
+  }
 
-  dm.setMap(gmap);
+  function onMouseMove(e) {
+    if (!drawing || !startLatLng || !rect) return;
+    var cur = latLngFromPixel(e.clientX, e.clientY);
+    var sw_ = new google.maps.LatLng(
+      Math.min(startLatLng.lat(), cur.lat()),
+      Math.min(startLatLng.lng(), cur.lng())
+    );
+    var ne_ = new google.maps.LatLng(
+      Math.max(startLatLng.lat(), cur.lat()),
+      Math.max(startLatLng.lng(), cur.lng())
+    );
+    rect.setBounds(new google.maps.LatLngBounds(sw_, ne_));
 
-  var l = google.maps.event.addListener(dm, 'rectanglecomplete', function(rect) {
-    dm.setDrawingMode(null);
-    dm.setMap(null);
-
-    _emMassaRetangulo = rect;
-
-    // Calcula estações dentro do retângulo
-    var bounds = rect.getBounds();
-    var dentro = _emMassaFiltrarEstacoes(bounds);
+    var dentro = _emMassaFiltrarEstacoes(rect.getBounds());
     _emMassaSelecionadas = dentro;
     _emMassaAtualizarLista(dentro);
+  }
 
-    // Listener: atualiza ao redimensionar o retângulo
-    var l2 = google.maps.event.addListener(rect, 'bounds_changed', function() {
-      var b = rect.getBounds();
-      var d = _emMassaFiltrarEstacoes(b);
-      _emMassaSelecionadas = d;
-      _emMassaAtualizarLista(d);
-    });
-    _emMassaListeners.push(l2);
-  });
+  function onMouseUp(e) {
+    if (!drawing) return;
+    drawing = false;
+    _emMassaRetangulo = rect;
 
-  _emMassaListeners.push(l);
-  window._emMassaDM = dm;
+    // Reativa gestos do mapa
+    gmap.setOptions({ draggable: true, gestureHandling: 'auto' });
+    if (mapDiv) mapDiv.style.cursor = '';
+
+    // Remove listeners de mouse
+    mapDiv.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+
+    var instrucao = document.getElementById('emMassaInstrucao');
+    if (instrucao) instrucao.innerHTML = 'Arraste novamente no mapa para redesenhar a seleção.';
+  }
+
+  mapDiv.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+
+  // Guarda referência para limpar no cancelar
+  window._emMassaCleanMouse = function() {
+    mapDiv.removeEventListener('mousedown', onMouseDown);
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+    gmap.setOptions({ draggable: true, gestureHandling: 'auto' });
+    mapDiv.style.cursor = '';
+  };
 }
 
 function _emMassaFiltrarEstacoes(bounds) {
   if (!window.estacoes || !bounds) return [];
   return window.estacoes.filter(function(e) {
-    var lat = Number(e.lat);
-    var lng = Number(e.lng);
+    var lat = typeof e.lat === 'number' ? e.lat : parseFloat(String(e.lat || '').replace(',', '.'));
+    var lng = typeof e.lng === 'number' ? e.lng : parseFloat(String(e.lng || '').replace(',', '.'));
     if (!isFinite(lat) || !isFinite(lng)) return false;
     return bounds.contains(new google.maps.LatLng(lat, lng));
   });
@@ -13532,6 +13581,12 @@ function _emMassaFecharTudo() {
   if (window._emMassaDM) {
     try { window._emMassaDM.setMap(null); } catch(e) {}
     window._emMassaDM = null;
+  }
+
+  // Remove mouse listeners do mapa se ainda ativos
+  if (window._emMassaCleanMouse) {
+    try { window._emMassaCleanMouse(); } catch(e) {}
+    window._emMassaCleanMouse = null;
   }
 
   // Remove listeners
