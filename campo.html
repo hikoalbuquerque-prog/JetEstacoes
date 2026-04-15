@@ -3558,6 +3558,7 @@ input:focus, select:focus {
         ? buildLiteIcon_(pickLiteColor_(e))
         : icone(e.tipo, e.statusEstacao, e.modalidade),
       optimized: true,
+      zIndex: 500,
       map: null
     });
 
@@ -12071,14 +12072,14 @@ function _criarMarkerLocal_(item, cor) {
     map: window._gmap,
     icon: {
       path: google.maps.SymbolPath.CIRCLE,
-      scale: 8,
+      scale: 6,
       fillColor: cor,
-      fillOpacity: 0.9,
-      strokeColor: '#fff',
-      strokeWeight: 2
+      fillOpacity: 0.65,
+      strokeColor: 'rgba(0,0,0,0.4)',
+      strokeWeight: 1
     },
     title: item.nome || item.cat,
-    zIndex: 100
+    zIndex: 50
   });
 
   marker.addListener('click', function() {
