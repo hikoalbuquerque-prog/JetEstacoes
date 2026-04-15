@@ -11905,35 +11905,6 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   if (contEl) contEl.textContent = '';
   painel.style.display = 'flex';
 
-  var queries = LOC_CATEGORIAS.map(function(cat) {
-    return cat.query + '(around:' + raioMetros + ',' + lat + ',' + lng + ');';
-  }).join('');
-
-  var overpassQuery = '[out:json][timeout:20];(' + queries + ');out body;';
-
-  var servidores = [
-    'https://overpass.private.coffee/api/interpreter',
-    'https://overpass-api.de/api/interpreter'
-  ];
-
-  function fetchOverpass(url) {
-    var controller = new AbortController();
-    var to = setTimeout(function(){ controller.abort(); }, 12000);
-function buscarLocaisPrioritarios(lat, lng, raioMetros) {
-  raioMetros = Number(raioMetros || 700);
-  _locaisResultados = {};
-  _locaisMarkers.forEach(function(m){ m.setMap(null); });
-  _locaisMarkers = [];
-
-  var painel = document.getElementById('painelLocaisPri');
-  var lista  = document.getElementById('painelLocaisLista');
-  var contEl = document.getElementById('painelLocaisContador');
-  if (!painel || !lista) return;
-
-  lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.4);text-align:center;padding:8px">Buscando POIs...</div>';
-  if (contEl) contEl.textContent = '';
-  painel.style.display = 'flex';
-
   var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
 
   var servidores = [
@@ -12293,7 +12264,6 @@ function _mlpStreetPreviewUrl_(lat, lng) {
     + '&pitch=0'
     + '&source=outdoor'
     + '&key=' + key;
-}    + '&key=' + key;
 }
 
 function _mlpGeocodeReverso_(lat, lng) {
