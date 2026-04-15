@@ -11909,13 +11909,15 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
 
   var servidores = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
-    'https://overpass-api.de/api/interpreter'
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
   ];
 
-  function fetchOverpass(url) {
+  function fetchOverpass(url, timeoutMs) {
     var controller = new AbortController();
-    var to = setTimeout(function(){ controller.abort(); }, 12000);
+    var to = setTimeout(function(){ controller.abort(); }, timeoutMs || 15000);
 
     return fetch(url, {
       method: 'POST',
@@ -11937,17 +11939,24 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
 
   function tentarServidor(idx) {
     if (idx >= servidores.length) {
-      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Serviço indisponível</div>';
+      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">'
+        + 'Todos os servidores indisponíveis. Tente novamente em instantes.'
+        + '<br><br><button onclick="cAbrirLocaisPrioritarios()" style="margin-top:6px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-size:11px;cursor:pointer">Tentar novamente</button>'
+        + '</div>';
       if (contEl) contEl.textContent = '';
       return;
     }
 
-    fetchOverpass(servidores[idx])
+    if (idx > 0 && lista) {
+      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:8px">Tentando servidor ' + (idx + 1) + ' de ' + servidores.length + '...</div>';
+    }
+
+    fetchOverpass(servidores[idx], 15000)
       .then(function(data) {
         _processarResultadosLocais_((data && data.elements) || [], lat, lng);
       })
       .catch(function(err) {
-        console.warn('[Locais] falha em', servidores[idx], err);
+        console.warn('[Locais] falha em', servidores[idx], err.message || err);
         tentarServidor(idx + 1);
       });
   }
