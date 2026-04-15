@@ -6974,12 +6974,18 @@ function cPlacePin(latLng) {
 
   if (!_campoPin) {
     _campoPin = new google.maps.Marker({
-      position: latLng, map: gmap, draggable: true, zIndex: 999999,
+      position: latLng,
+      map: gmap,
+      draggable: true,
+      zIndex: 999999,
       icon: {
         path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z',
-        fillColor: '#3b82f6', fillOpacity: 1,
-        strokeColor: '#fff', strokeWeight: 2,
-        scale: 1.6, anchor: new google.maps.Point(12, 24)
+        fillColor: '#3b82f6',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 2,
+        scale: 1.6,
+        anchor: new google.maps.Point(12, 24)
       }
     });
 
@@ -11850,7 +11856,11 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   if (contEl) contEl.textContent = '';
   painel.style.display = 'flex';
 
-  var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
+  var queries = LOC_CATEGORIAS.map(function(cat) {
+    return cat.query + '(around:' + raioMetros + ',' + lat + ',' + lng + ');';
+  }).join('');
+
+  var overpassQuery = '[out:json][timeout:20];(' + queries + ');out body;';
 
   var servidores = [
     'https://overpass.private.coffee/api/interpreter',
@@ -11883,20 +11893,18 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
     erros = erros || [];
 
     if (idx >= servidores.length) {
-      var detalhe = erros.length ? (' (' + erros.join(' | ') + ')') : '';
-      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Servico indisponivel' + detalhe + '</div>';
+      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Serviço indisponível</div>';
       if (contEl) contEl.textContent = '';
       return;
     }
 
     fetchOverpass(servidores[idx])
       .then(function(data) {
-        var elements = (data && data.elements) || [];
-        _processarResultadosLocais_(elements, lat, lng);
+        _processarResultadosLocais_((data && data.elements) || [], lat, lng);
       })
       .catch(function(err) {
         console.warn('[Locais] falha em', servidores[idx], err);
-        erros.push((servidores[idx].split('/')[2] || 'srv') + ': ' + (err.message || 'erro'));
+        erros.push(err && err.message ? err.message : 'erro');
         tentarServidor(idx + 1, erros);
       });
   }
@@ -12205,6 +12213,17 @@ function _reverseGeocodeFast_(lat, lng, onOk, onErr) {
   );
 }
 
+function _mlpStreetPreviewUrl_(lat, lng) {
+  var key = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
+  if (!key) return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=900x450'
+    + '&location=' + Number(lat) + ',' + Number(lng)
+    + '&fov=90'
+    + '&pitch=0'
+    + '&source=outdoor'
+    + '&key=' + key;
+}
+
 function _mlpGeocodeReverso_(lat, lng) {
   lat = Number(lat);
   lng = Number(lng);
@@ -12233,7 +12252,6 @@ function _mlpGeocodeReverso_(lat, lng) {
 }
 
 
-
 function abrirModalLocal(item) {
   _mlpItem = item;
   _mlpGeocodedAddr = null;
@@ -12256,7 +12274,6 @@ function abrirModalLocal(item) {
 
   var svImg = document.getElementById('mlpStreetImg');
   var svPh  = document.getElementById('mlpStreetPlaceholder');
-
   if (svImg && svPh) {
     svImg.style.display = 'none';
     svPh.style.display = 'flex';
@@ -12275,7 +12292,7 @@ function abrirModalLocal(item) {
       };
       svImg.src = url;
     } else {
-      svPh.textContent = 'Chave Maps indisponível';
+      svPh.textContent = 'Street View indisponível';
     }
   }
 
@@ -12285,12 +12302,11 @@ function abrirModalLocal(item) {
   var elLoading   = document.getElementById('mlpLoadingIA');
 
   if (elResultado) elResultado.style.display = 'none';
-  if (elBtnsIni)   elBtnsIni.style.display = 'none';
-  if (elBtnsPos)   elBtnsPos.style.display = 'flex';
+  if (elBtnsIni)   elBtnsIni.style.display = 'flex';
+  if (elBtnsPos)   elBtnsPos.style.display = 'none';
   if (elLoading)   elLoading.style.display = 'none';
 
   modal.style.display = 'block';
-
   _mlpGeocodeReverso_(item.lat, item.lng);
 }
 
