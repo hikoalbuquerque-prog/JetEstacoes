@@ -11873,22 +11873,27 @@ function _renderLocaisCardsAtivos_() {
   if (btnMostrar) btnMostrar.style.display = total > 0 ? 'block' : 'none';
 }
 
-function _locMontarQueryOverpass_(lat, lng, raioMetros) {
-  var parts = [];
+// Mapeamento categoria -> tipos Google Places
+var _LOC_GPLACES_TYPES = {
+  restaurante: ['restaurant', 'cafe', 'bar', 'meal_takeaway', 'food'],
+  hotel:       ['lodging'],
+  shopping:    ['shopping_mall', 'supermarket', 'convenience_store', 'department_store'],
+  transporte:  ['subway_station', 'train_station', 'bus_station', 'transit_station'],
+  academia:    ['gym', 'stadium', 'sports_complex'],
+  educacao:    ['school', 'university', 'library'],
+  saude:       ['hospital', 'pharmacy', 'doctor', 'dentist', 'health'],
+  banco:       ['bank', 'atm'],
+  parque:      ['park', 'amusement_park'],
+  escritorio:  ['real_estate_agency', 'finance', 'insurance_agency']
+};
 
-  LOC_CATEGORIAS.forEach(function(cat) {
-    var arr = Array.isArray(cat.query) ? cat.query : [cat.query];
-    arr.forEach(function(q) {
-      parts.push(
-        q.replace(/\{r\}/g, String(raioMetros))
-         .replace(/\{lat\}/g, String(lat))
-         .replace(/\{lng\}/g, String(lng))
-         + ';'
-      );
-    });
-  });
+var _locPlacesService = null;
 
-  return '[out:json][timeout:18];(' + parts.join('') + ');out center qt;';
+function _getPlacesService_() {
+  if (!_locPlacesService && window._gmap && window.google && google.maps.places) {
+    _locPlacesService = new google.maps.places.PlacesService(window._gmap);
+  }
+  return _locPlacesService;
 }
 
 function buscarLocaisPrioritarios(lat, lng, raioMetros) {
@@ -11906,98 +11911,79 @@ function buscarLocaisPrioritarios(lat, lng, raioMetros) {
   if (contEl) contEl.textContent = '';
   painel.style.display = 'flex';
 
-  var overpassQuery = _locMontarQueryOverpass_(lat, lng, raioMetros);
+  var svc = _getPlacesService_();
+  if (!svc) {
+    lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">Google Places indisponível</div>';
+    return;
+  }
 
-  var servidores = [
-    'https://overpass-api.de/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.openstreetmap.ru/api/interpreter',
-    'https://overpass-api.de/api/interpreter'
-  ];
+  var center = new google.maps.LatLng(lat, lng);
+  var categorias = LOC_CATEGORIAS.slice();
+  var pendentes = categorias.length;
+  var porCategoria = {};
+  LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
 
-  function fetchOverpass(url, timeoutMs) {
-    var controller = new AbortController();
-    var to = setTimeout(function(){ controller.abort(); }, timeoutMs || 15000);
+  function distM(aLat, aLng, bLat, bLng) {
+    try {
+      return google.maps.geometry.spherical.computeDistanceBetween(
+        new google.maps.LatLng(Number(aLat), Number(aLng)),
+        new google.maps.LatLng(Number(bLat), Number(bLng))
+      );
+    } catch(e) { return 999999; }
+  }
 
-    return fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Accept': 'application/json,text/plain,*/*'
-      },
-      body: 'data=' + encodeURIComponent(overpassQuery),
-      signal: controller.signal
-    }).then(function(r) {
-      clearTimeout(to);
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    }).catch(function(err) {
-      clearTimeout(to);
-      throw err;
+  function onCategoriaPronta() {
+    pendentes--;
+    if (pendentes > 0) return;
+    // Todas as categorias responderam — processar
+    var elements = [];
+    LOC_CATEGORIAS.forEach(function(cat) {
+      porCategoria[cat.key].forEach(function(item) {
+        elements.push(item);
+      });
+    });
+    _processarResultadosLocais_(elements, lat, lng);
+  }
+
+  function buscarCategoria(cat) {
+    var tipos = _LOC_GPLACES_TYPES[cat.key] || [];
+    if (!tipos.length) { onCategoriaPronta(); return; }
+
+    // nearbySearch aceita apenas 1 type por vez — usa o primeiro mais representativo
+    var req = {
+      location: center,
+      radius: raioMetros,
+      type: tipos[0]
+    };
+
+    svc.nearbySearch(req, function(results, status) {
+      var PS = google.maps.places.PlacesServiceStatus;
+      if (status === PS.OK && results && results.length) {
+        results.forEach(function(place) {
+          var loc = place.geometry && place.geometry.location;
+          if (!loc) return;
+          var plat = loc.lat();
+          var plng = loc.lng();
+          porCategoria[cat.key].push({
+            lat: plat,
+            lng: plng,
+            nome: (place.name || '').trim(),
+            cat: cat.key,
+            dist: distM(lat, lng, plat, plng)
+          });
+        });
+      }
+      // ZERO_RESULTS ou erro = categoria vazia, não é falha crítica
+      onCategoriaPronta();
     });
   }
 
-  function tentarServidor(idx) {
-    if (idx >= servidores.length) {
-      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:12px">'
-        + 'Todos os servidores indisponíveis. Tente novamente em instantes.'
-        + '<br><br><button onclick="cAbrirLocaisPrioritarios()" style="margin-top:6px;padding:6px 14px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;font-size:11px;cursor:pointer">Tentar novamente</button>'
-        + '</div>';
-      if (contEl) contEl.textContent = '';
-      return;
-    }
-
-    if (idx > 0 && lista) {
-      lista.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,.35);text-align:center;padding:8px">Tentando servidor ' + (idx + 1) + ' de ' + servidores.length + '...</div>';
-    }
-
-    fetchOverpass(servidores[idx], 20000)
-      .then(function(data) {
-        _processarResultadosLocais_((data && data.elements) || [], lat, lng);
-      })
-      .catch(function(err) {
-        console.warn('[Locais] falha em', servidores[idx], err.message || err);
-        tentarServidor(idx + 1);
-      });
-  }
-
-  tentarServidor(0);
+  categorias.forEach(function(cat) {
+    buscarCategoria(cat);
+  });
 }
 
 function _processarResultadosLocais_(elements, centerLat, centerLng) {
-  function detectarCategoria(tags) {
-    tags = tags || {};
-
-    if (tags.amenity && /restaurant|cafe|fast_food|food_court|bar|pub/.test(tags.amenity)) return 'restaurante';
-    if (tags.tourism && /hotel|hostel|motel|guest_house/.test(tags.tourism)) return 'hotel';
-    if (tags.shop && /mall|department_store|supermarket|convenience/.test(tags.shop)) return 'shopping';
-    if (
-      (tags.public_transport && /station|stop_position|platform/.test(tags.public_transport)) ||
-      tags.amenity === 'bus_station' ||
-      (tags.railway && /station|halt|tram_stop|subway_entrance/.test(tags.railway))
-    ) return 'transporte';
-    if (tags.leisure && /fitness_centre|sports_centre|stadium/.test(tags.leisure)) return 'academia';
-    if (tags.amenity && /school|university|college|library/.test(tags.amenity)) return 'educacao';
-    if (tags.amenity && /hospital|clinic|pharmacy|doctors|dentist/.test(tags.amenity)) return 'saude';
-    if (tags.amenity && /bank|atm|bureau_de_change/.test(tags.amenity)) return 'banco';
-    if (tags.leisure && /park|playground|garden/.test(tags.leisure)) return 'parque';
-    if (tags.office) return 'escritorio';
-
-    return null;
-  }
-
-  function getLat(el) {
-    if (el.lat != null) return Number(el.lat);
-    if (el.center && el.center.lat != null) return Number(el.center.lat);
-    return NaN;
-  }
-
-  function getLng(el) {
-    if (el.lon != null) return Number(el.lon);
-    if (el.center && el.center.lon != null) return Number(el.center.lon);
-    return NaN;
-  }
-
   function distM(aLat, aLng, bLat, bLng) {
     try {
       return google.maps.geometry.spherical.computeDistanceBetween(
@@ -12013,19 +11999,18 @@ function _processarResultadosLocais_(elements, centerLat, centerLng) {
   LOC_CATEGORIAS.forEach(function(cat) { porCategoria[cat.key] = []; });
 
   (elements || []).forEach(function(el) {
-    var tags = el.tags || {};
-    var cat = detectarCategoria(tags);
-    var lat = getLat(el);
-    var lng = getLng(el);
+    var cat = el.cat;
+    var lat = Number(el.lat);
+    var lng = Number(el.lng);
 
-    if (!cat || !isFinite(lat) || !isFinite(lng)) return;
+    if (!cat || !porCategoria[cat] || !isFinite(lat) || !isFinite(lng)) return;
 
     porCategoria[cat].push({
       lat: lat,
       lng: lng,
-      nome: (tags.name || tags['name:pt'] || '').trim(),
+      nome: (el.nome || '').trim(),
       cat: cat,
-      dist: distM(centerLat, centerLng, lat, lng)
+      dist: el.dist != null ? el.dist : distM(centerLat, centerLng, lat, lng)
     });
   });
 
