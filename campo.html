@@ -12255,17 +12255,6 @@ function _reverseGeocodeFast_(lat, lng, onOk, onErr) {
   );
 }
 
-function _mlpStreetPreviewUrl_(lat, lng) {
-  var key = window._MAPS_KEY || window.MAPS_KEY || window.GMAPS_KEY || '';
-  if (!key) return '';
-  return 'https://maps.googleapis.com/maps/api/streetview?size=900x450'
-    + '&location=' + Number(lat) + ',' + Number(lng)
-    + '&fov=90'
-    + '&pitch=0'
-    + '&source=outdoor'
-    + '&key=' + key;
-}
-
 function _mlpGeocodeReverso_(lat, lng) {
   lat = Number(lat);
   lng = Number(lng);
