@@ -10219,7 +10219,7 @@ function _vrrScoreCalcada(lat, lng) {
     _gasRun('analisarCalcadaIA', {
         lat: latNum,
         lng: lngNum,
-        amostras: 2,
+        amostras: 3,
         contexto: 'varredura'
       },
       function(res) {
@@ -12572,7 +12572,7 @@ function mlpAnalisarIA() {
   _gasRun('analisarCalcadaIA', {
     lat: lat,
     lng: lng,
-    amostras: 2,
+    amostras: 3,
     contexto: 'local_prioritario'
   },
     function(res) {
