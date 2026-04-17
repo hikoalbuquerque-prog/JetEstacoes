@@ -11156,8 +11156,8 @@ function _mlpAbrirStreetViewManual() {
 var _svAjusteAberto = false;
 
 function _svAjusteAbrir(ctx) {
-if (!_svAjusteCtx) return;
-_svAjusteAberto = true;
+  _svAjusteAberto = true;
+
   if (!window.google || !window.google.maps || !window.google.maps.StreetViewPanorama) {
     cToast('Street View indisponível.', 'warn');
     return;
