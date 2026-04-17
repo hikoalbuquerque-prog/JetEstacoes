@@ -11243,6 +11243,18 @@ function _vrrAdicionarItemLista(r) {
   div.dataset.heading = String(heading);
   div.dataset.pitch = String(pitch);
   div.dataset.rank = String(cls.rank || 0);
+  div.dataset.latOriginal = String(Number(r.latOriginal || r.lat));
+  div.dataset.lngOriginal = String(Number(r.lngOriginal || r.lng));
+  div.dataset.ajustadoIa = r.ajustadoIA ? '1' : '0';
+  div.dataset.ajusteLabel = r.ajusteLabel || '';
+  div.dataset.ajusteTipo = r.ajusteTipo || '';
+  div.dataset.ajusteDistM = String(Number(r.ajusteDistM || 0));
+  // Dados da IA de calçada — usados ao salvar na planilha
+  div.dataset.calcadaLargura   = String(r.calcadaLargura || 'indefinido');
+  div.dataset.calcadaScore     = String(Number(r.scoreCalcada || 0));
+  div.dataset.calcadaAprovado  = r.aptoFisico ? '1' : '0';
+  div.dataset.calcadaConfianca = String(r.calcadaConfianca || '');
+  div.dataset.calcadaMotivo    = String(r.calcadaMotivoCodigo || '');
 
   var svResumo = '';
   if (imgA > 0) {
@@ -11347,6 +11359,13 @@ function _vrrRecusar(btn, lat, lng) {
 
 // Selecao em lote
 var _vrrSelecao = [];
+// Converte "3.2 metros", "3,2m", "3 m" → "3.2" (string numérica) ou "" se indefinido
+function _normalizarLarguraIA_(texto) {
+  if (!texto || String(texto).toLowerCase().indexOf('indefinido') >= 0) return '';
+  var m = String(texto).replace(',', '.').match(/(\d+(\.\d+)?)/);
+  return m ? m[1] : '';
+}
+
 function _vrrAtualizarLote() {
   var checks = document.querySelectorAll('.vrr-item input[type=checkbox]:checked');
 
@@ -11360,7 +11379,12 @@ function _vrrAtualizarLote() {
       ajustadoIA: item.dataset.ajustadoIa === '1',
       ajusteLabel: item.dataset.ajusteLabel || '',
       ajusteTipo: item.dataset.ajusteTipo || '',
-      ajusteDistM: Number(item.dataset.ajusteDistM || 0)
+      ajusteDistM: Number(item.dataset.ajusteDistM || 0),
+      calcadaLargura:   item.dataset.calcadaLargura   || 'indefinido',
+      calcadaScore:     Number(item.dataset.calcadaScore  || 0),
+      calcadaAprovado:  item.dataset.calcadaAprovado === '1',
+      calcadaConfianca: item.dataset.calcadaConfianca || '',
+      calcadaMotivo:    item.dataset.calcadaMotivo    || ''
     };
   });
 
@@ -11445,7 +11469,7 @@ function _vrrConfirmarLote() {
           observacoes: obs || 'Adicionado em lote via Varredura IA',
           status: 'SOLICITADO',
           dimensoes: '',
-          larguraFaixa: '',
+          larguraFaixa: _normalizarLarguraIA_(p.calcadaLargura),
           geo: {
             cidade:   geo.cidade   || '',
             bairro:   geo.bairro   || '',
@@ -11454,7 +11478,14 @@ function _vrrConfirmarLote() {
           },
           operador: CS.user.email,
           origem: 'PWA_CAMPO_LOTE',
-          foto: null
+          foto: null,
+          calcadaIA: {
+            largura:   p.calcadaLargura   || 'indefinido',
+            score:     p.calcadaScore     || 0,
+            aprovado:  p.calcadaAprovado  || false,
+            confianca: p.calcadaConfianca || '',
+            motivo:    p.calcadaMotivo    || ''
+          }
         };
 
         _gasRun('addEstacaoFromMapa', payload,
