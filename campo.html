@@ -7337,8 +7337,13 @@ async function cSubmit() {
         },
         operador: CS.user.email,
         origem: 'PWA_CAMPO',
-        foto: rec.photoB64 ? { base64: rec.photoB64, mime: rec.photoMime, name: 'foto.jpg' } : null
+        foto: rec.photoB64 ? { base64: rec.photoB64, mime: rec.photoMime, name: 'foto.jpg' } : null,
+        // Dados da IA de calçada — injetados se vieram da análise
+        calcadaIA: window._drawerCalcadaIA || null
       };
+
+      // Limpa após usar
+      window._drawerCalcadaIA = null;
 
       var res = await new Promise(function(resolve) {
         _gasRun('addEstacaoFromMapa', payload, resolve, function(e) {
@@ -12514,6 +12519,19 @@ function mlpAdicionarDireto() {
       function(geo) {
         _setDrawerGeoUI_(geo, lat, lng, 'Endereço não encontrado');
 
+        // Injeta dados da IA no drawer se disponíveis
+        if (item.calcadaIA) {
+          var largura = _normalizarLarguraIA_(item.calcadaIA.largura);
+          if (largura) {
+            var elLarg = document.getElementById('cLarguraFaixa');
+            if (elLarg && !elLarg.value) {
+              elLarg.value = largura;
+            }
+          }
+          // Armazena no estado do drawer para incluir no payload
+          window._drawerCalcadaIA = item.calcadaIA;
+        }
+
         var elObs = document.getElementById('cObs');
         if (elObs && item.nome) {
           var tag = 'Próximo a: ' + item.nome;
@@ -12607,6 +12625,17 @@ function mlpAnalisarIA() {
 
 function _exibirResultadoIA_(resultado) {
   document.getElementById('mlpLoadingIA').style.display = 'none';
+
+  // Salva dados IA no _mlpItem para usar ao adicionar estação
+  if (_mlpItem && resultado) {
+    _mlpItem.calcadaIA = {
+      largura:   resultado.larguraEstimada || 'indefinido',
+      score:     Number(resultado.score    || 0),
+      aprovado:  resultado.aprovado        === true,
+      confianca: resultado.confianca       || '',
+      motivo:    resultado.motivoCodigo    || ''
+    };
+  }
 
   var divRes = document.getElementById('mlpResultadoIA');
   divRes.style.display = 'block';
