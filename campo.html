@@ -2607,6 +2607,17 @@ input:focus, select:focus {
         </label>
         <div id="vrrFurosInfo" style="display:none;margin-top:6px;font-size:10px;color:rgba(255,255,255,.4)"></div>
       </div>
+
+      <div style="margin-top:8px;padding:8px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="vrrModoEconomico" style="accent-color:#10b981;width:14px;height:14px">
+          <div>
+            <div style="font-size:11px;font-weight:700;color:#6ee7b7">Modo Econômico</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px">Pula IA em pontos com score POI baixo — reduz custo ~60%</div>
+          </div>
+        </label>
+        <div id="vrrEconomicoInfo" style="display:none;margin-top:6px;font-size:10px;color:rgba(16,185,129,.6)"></div>
+      </div>
     </div>
 
     <!-- Botao iniciar -->
@@ -10125,6 +10136,66 @@ function _vrrScorePOIs(lat, lng) {
 }
 
 // ── Analise de calcada via GAS + Claude ──────────────
+/**
+ * _vrrScoreCalcada_comEconomia_
+ * Wrapper de _vrrScoreCalcada que implementa o Modo Econômico.
+ *
+ * Lógica de economia em 3 níveis:
+ *
+ * 1. Score de cobertura = 0 → ponto já tem estação perto → pula IA (score inútil)
+ * 2. Modo econômico ativo + scoreCobertura < limiar → retorna score neutro sem chamar Gemini
+ * 3. Cache de resultados por coordenada arredondada (3 casas decimais ~111m)
+ *    evita chamar IA duas vezes no mesmo ponto durante a varredura
+ */
+var _vrrIACache = {};
+
+function _vrrScoreCalcada_comEconomia_(lat, lng) {
+  var modoEconomico = !!(document.getElementById('vrrModoEconomico') || {}).checked;
+  var scoreCobertura = _vrrScoreCobertura(lat, lng);
+
+  // Nível 1 — ponto com estação muito próxima: não vale chamar IA
+  if (scoreCobertura === 0) {
+    return Promise.resolve({
+      score: 0, aprovado: false, aptoFisico: false,
+      largura: 'indefinido', obs: 'Ponto descartado — estação existente próxima',
+      confianca: 'baixa', motivoCodigo: 'IMAGEM_INSUFICIENTE',
+      imagensAnalisadas: 0, imagensPositivas: 0, imagensBloqueantes: 0,
+      economizado: true
+    });
+  }
+
+  // Nível 2 — modo econômico: só chama IA se cobertura >= 15 (ponto relevante)
+  var LIMIAR_ECONOMICO = 15;
+  if (modoEconomico && scoreCobertura < LIMIAR_ECONOMICO) {
+    var infoEl = document.getElementById('vrrEconomicoInfo');
+    if (infoEl) {
+      infoEl.style.display = 'block';
+      var pulados = Number(infoEl.dataset.pulados || 0) + 1;
+      infoEl.dataset.pulados = pulados;
+      infoEl.textContent = pulados + ' pontos pulados (cobertura baixa)';
+    }
+    return Promise.resolve({
+      score: 0, aprovado: false, aptoFisico: false,
+      largura: 'indefinido', obs: 'Ponto pulado — Modo Econômico (cobertura insuficiente)',
+      confianca: 'baixa', motivoCodigo: 'IMAGEM_INSUFICIENTE',
+      imagensAnalisadas: 0, imagensPositivas: 0, imagensBloqueantes: 0,
+      economizado: true
+    });
+  }
+
+  // Nível 3 — cache: evita chamar IA duas vezes no mesmo ponto
+  var cacheKey = Number(lat).toFixed(3) + ',' + Number(lng).toFixed(3);
+  if (_vrrIACache[cacheKey]) {
+    return Promise.resolve(_vrrIACache[cacheKey]);
+  }
+
+  // Chama IA normalmente e armazena no cache
+  return _vrrScoreCalcada(lat, lng).then(function(resultado) {
+    _vrrIACache[cacheKey] = resultado;
+    return resultado;
+  });
+}
+
 function _vrrScoreCalcada(lat, lng) {
   return new Promise(function(resolve) {
     var latNum = Number(String(lat).replace(',', '.'));
@@ -10203,6 +10274,11 @@ function iniciarVarredura() {
   _vrrParar = false;
   _vrrAtivo = true;
   _vrrResultados = [];
+  _vrrIACache = {}; // limpa cache IA entre varreduras
+
+  // Reseta contador do modo econômico
+  var econInfo = document.getElementById('vrrEconomicoInfo');
+  if (econInfo) { econInfo.style.display = 'none'; econInfo.dataset.pulados = '0'; econInfo.textContent = ''; }
   _vrrLimparHeat();
   // Limpar pins OSM da varredura anterior
   if (window._vrrOSMMarkers) {
@@ -10727,7 +10803,7 @@ function _vrrProcessarFila(pontos, idx, total) {
 
   Promise.all([
     _vrrScorePOIs(p.lat, p.lng),
-    _vrrScoreCalcada(p.lat, p.lng)
+    _vrrScoreCalcada_comEconomia_(p.lat, p.lng)
   ]).then(function(resultados) {
     var poi0 = resultados[0] || { score: 0, count: 0 };
     var calcadaRaw0 = resultados[1] || {};
