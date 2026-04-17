@@ -8212,12 +8212,17 @@ function cGerarStreetView(evt) {
   _gasRun('gerarStreetViewEstacao',
     { codigo: e.codigo, lat: e.lat, lng: e.lng, email: CS.user && CS.user.email },
     function(res) {
+      btn.disabled    = false;
       if (!res || !res.ok) {
-        btn.disabled    = false;
-        btn.textContent = 'Erro: ' + (res && res.error ? res.error : 'tente novamente');
+        var errMsg = (res && res.error) ? res.error : 'Erro desconhecido';
+        btn.textContent = 'Erro';
         btn.style.color = '#f87171';
+        cToast('Street View: ' + errMsg, 'error');
+        console.error('[cGerarStreetView] erro:', errMsg);
         return;
       }
+      btn.textContent = 'Street View';
+      btn.style.color = '';
       e.street = res.url;
       if (window.estacoes) {
         window.estacoes.forEach(function(est) {
@@ -8236,7 +8241,9 @@ function cGerarStreetView(evt) {
       btn.disabled    = false;
       btn.textContent = 'Erro ao gerar';
       btn.style.color = '#f87171';
-      cToast('Erro: ' + String(err), 'error');
+      var msg = String(err && err.message ? err.message : err);
+      cToast('Street View falhou: ' + msg, 'error');
+      console.error('[cGerarStreetView] falha:', msg);
     });
 }
 
