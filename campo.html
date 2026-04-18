@@ -7356,6 +7356,20 @@ async function cSubmit() {
         await cPut(rec);
         synced = true;
 
+        // Gera Street View separadamente se veio de análise IA
+        if (res.estacao && res.estacao.gerarStreetView && res.estacao.codigo) {
+          _gasRun('gerarStreetViewEstacao',
+            { codigo: res.estacao.codigo, lat: rec.lat, lng: rec.lng },
+            function(svRes) {
+              if (svRes && svRes.ok && svRes.url) {
+                if (res.estacao) res.estacao.street = svRes.url;
+                cToast('Street View salvo!', 'success');
+              }
+            },
+            function() {} // silencioso se falhar
+          );
+        }
+
         if (window.estacoes) {
           var novaEst = res.estacao || {};
           novaEst.lat           = novaEst.lat          || rec.lat;
